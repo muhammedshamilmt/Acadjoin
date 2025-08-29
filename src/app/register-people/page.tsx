@@ -799,33 +799,31 @@ const RegisterPeople = () => {
                         />
                       </div>
 
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="expectedSalary">Expected Salary (per annum)</Label>
-                          <Input
-                            id="expectedSalary"
-                            value={formData.expectedSalary}
-                            onChange={(e) => setFormData(prev => ({ ...prev, expectedSalary: e.target.value }))}
-                            placeholder="e.g., ₹6-8 LPA"
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="expectedSalary">Expected Salary (per annum)</Label>
+                        <Input
+                          id="expectedSalary"
+                          value={formData.expectedSalary}
+                          onChange={(e) => setFormData(prev => ({ ...prev, expectedSalary: e.target.value }))}
+                          placeholder="e.g., ₹6-8 LPA"
+                        />
+                      </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="averageResponseTime">Average Response Time</Label>
-                          <Select 
-                            value={formData.averageResponseTime} 
-                            onValueChange={(value) => setFormData(prev => ({ ...prev, averageResponseTime: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select response time" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {responseTimeOptions.map(option => (
-                                <SelectItem key={option} value={option}>{option}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="averageResponseTime">Average Response Time</Label>
+                        <Select 
+                          value={formData.averageResponseTime} 
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, averageResponseTime: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select response time" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {responseTimeOptions.map(option => (
+                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       {/* Interested Fields */}
@@ -898,39 +896,23 @@ const RegisterPeople = () => {
                         Next →
                       </Button>
                     ) : (
-                      <>
-                        <Button 
-                          type="button" 
-                          variant="outline"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to clear the form? This action cannot be undone.')) {
-                              resetForm();
-                            }
-                          }}
-                        >
-                          Clear Form
-                        </Button>
-                        <Button type="button" variant="outline">
-                          Save as Draft
-                        </Button>
-                        <Button 
-                          type="submit" 
-                          className="bg-primary hover:bg-primary/90" 
-                          disabled={isSubmitting}
-                        >
-                          {isSubmitting ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                              Creating Profile...
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Create Profile
-                            </>
-                          )}
-                        </Button>
-                      </>
+                      <Button 
+                        type="submit" 
+                        className="bg-primary hover:bg-primary/90" 
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                            Creating Profile...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Create Profile
+                          </>
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>

@@ -81,12 +81,6 @@ const HeroSection = () => {
 
             {/* CTA Button with Arrow */}
             <div className="flex items-center space-x-4">
-              <Button variant="cta" size="xl" className="group">
-                Explore
-                <div className="ml-2 p-1 bg-white/20 rounded-full group-hover:bg-white/30 transition-all duration-300">
-                  <ArrowUpRight size={18} />
-                </div>
-              </Button>
               <Link href="/registration">
               <Button variant="cta" size="xl" className="group">
               <div className="ml-2 p-1 bg-white/20 rounded-md group-hover:bg-white/30 transition-all duration-300">
