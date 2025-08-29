@@ -134,6 +134,7 @@ Create a `.env.local` file in the root directory:
 ```env
 # Database
 MONGODB_URI=your_mongodb_connection_string
+MONGODB_DB_NAME=your_mongodb_name
 
 # Firebase Configuration
 NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key

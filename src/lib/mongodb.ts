@@ -1,7 +1,8 @@
 import { MongoClient, Db } from 'mongodb';
 
 // Use env if provided, otherwise fall back to local MongoDB
-const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/futurepath';
+const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+const dbName = process.env.MONGODB_DB_NAME || 'futurepath';
 const options = {
   serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
   socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
@@ -36,7 +37,7 @@ export default clientPromise;
 export async function getDb(): Promise<Db> {
   try {
     const client = await clientPromise;
-    return client.db();
+    return client.db(dbName);
   } catch (error) {
     console.error('MongoDB connection error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown MongoDB error';
