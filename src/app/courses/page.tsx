@@ -22,9 +22,9 @@ import {
   MessageCircle,
   Calendar,
   Briefcase,
-  Loader2,
   GraduationCap
 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/loading-spinner';
 import { useRouter } from 'next/navigation';
 
 interface InstituteRegistration {
@@ -249,12 +249,8 @@ const Courses = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 flex items-center justify-center min-h-screen">
-          <div className="flex items-center space-x-2">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <span className="text-lg">Loading courses and mentors...</span>
-          </div>
-        </div>
+        <PageLoader text="Loading courses and mentors..." />
+        <Footer />
       </div>
     );
   }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useAuth as useAuthStore } from '@/lib/auth';
+import { FullScreenLoader } from '@/components/ui/loading-spinner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -42,14 +43,7 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }, [user, storeUser, isAuthenticated, loading, storeHydrated, router]);
 
   if (loading || !storeHydrated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 border-2 border-coral-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-lg">Loading...</span>
-        </div>
-      </div>
-    );
+    return <FullScreenLoader text="Loading..." />;
   }
 
   if (!isAuthenticated) {

@@ -896,23 +896,23 @@ const RegisterPeople = () => {
                         Next →
                       </Button>
                     ) : (
-                      <Button 
-                        type="submit" 
-                        className="bg-primary hover:bg-primary/90" 
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                            Creating Profile...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Create Profile
-                          </>
-                        )}
-                      </Button>
+                                              <Button 
+                          type="submit" 
+                          className="bg-primary hover:bg-primary/90" 
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" style={{ animationDuration: '0.6s' }} />
+                              Creating Profile...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Create Profile
+                            </>
+                          )}
+                        </Button>
                     )}
                   </div>
                 </div>

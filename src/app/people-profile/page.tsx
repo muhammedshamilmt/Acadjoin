@@ -36,6 +36,7 @@ import {
   X,
   LogOut
 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/loading-spinner';
 import DeleteProfileButton from '@/components/deleteprofilebutton';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -485,12 +486,7 @@ const StudentProfile = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-primary/40 border-t-primary rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading your people profile...</p>
-          </div>
-        </div>
+        <PageLoader text="Loading your people profile..." />
         <Footer />
       </div>
     );

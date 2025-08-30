@@ -44,7 +44,8 @@ import {
   Crown,
   Clock,
   Wrench,
-  Image
+  Image,
+  Megaphone
 } from 'lucide-react';
 import institute1 from '../../../public/institute-1.jpg';
 import { useAuth as useAuthStore } from '@/lib/auth';
@@ -74,7 +75,7 @@ import {
 } from '@/components/ui/dialog';
 import { loadRazorpayScript } from '@/lib/razorpay';
 import { MobileTabs } from '@/components/ui/mobile-tabs';
-import { Megaphone } from 'lucide-react';
+import { PageLoader } from '@/components/ui/loading-spinner';
 
 const InstituteProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -867,10 +868,7 @@ const InstituteProfile = () => {
         
       {isLoading ? (
         <div className="pt-24 pb-12 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading institute profile...</p>
-          </div>
+          <PageLoader text="Loading institute profile..." />
         </div>
       ) : (
         <>

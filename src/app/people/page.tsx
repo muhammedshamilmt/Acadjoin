@@ -19,9 +19,9 @@ import {
   Calendar,
   BookOpen,
   Award,
-  Filter,
-  Loader2
+  Filter
 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/loading-spinner';
 import QuickConnectModal from '@/components/QuickConnectModal';
 
 interface PeopleRegistration {
@@ -151,12 +151,8 @@ const People = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 flex items-center justify-center min-h-screen">
-          <div className="flex items-center space-x-2">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <span className="text-lg">Loading people...</span>
-          </div>
-        </div>
+        <PageLoader text="Loading people..." />
+        <Footer />
       </div>
     );
   }

@@ -313,7 +313,7 @@ export default function Login() {
                 <Button type="submit" className="w-full bg-black hover:bg-red-500" disabled={isLoading}>
                   {isLoading ? (
                     <div className="flex items-center">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" style={{ animationDuration: '0.6s' }} />
                       Signing in...
                     </div>
                   ) : (

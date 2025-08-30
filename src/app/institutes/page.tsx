@@ -20,12 +20,12 @@ import {
   ExternalLink,
   Calendar,
   Award,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight
 } from 'lucide-react';
+import { PageLoader } from '@/components/ui/loading-spinner';
 import institute1 from '../../../public/institute-1.jpg';
 
 interface InstituteData {
@@ -248,12 +248,7 @@ const InstitutesContent = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="pt-24 flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Loading institutes...</p>
-          </div>
-        </div>
+        <PageLoader text="Loading institutes..." />
         <Footer />
       </div>
     );
@@ -614,11 +609,7 @@ const InstitutesContent = () => {
 
 const Institutes = () => {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    }>
+    <Suspense fallback={<PageLoader text="Loading institutes..." />}>
       <InstitutesContent />
     </Suspense>
   );
