@@ -324,7 +324,7 @@ const AdminPage = () => {
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 p-6 pt-20 lg:pt-6 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto">
           {activeTab === "dashboard" && <Dashboard />}
           {activeTab === "users" && <Users />}
           {activeTab === "people" && <PeopleManagement />}

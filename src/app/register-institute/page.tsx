@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { LoadingToast } from '@/components/ui/loading-toast';
 import { 
   Building2,
   MapPin,
@@ -109,6 +110,8 @@ const RegisterInstitute = () => {
   const [facilities, setFacilities] = useState(['']);
   const [recruiters, setRecruiters] = useState<Recruiter[]>([{ name: '', logoDataUrl: '' }]);
   const [keywordText, setKeywordText] = useState('');
+  const [showLoadingToast, setShowLoadingToast] = useState(false);
+  const [loadingToastData, setLoadingToastData] = useState({ title: '', description: '' });
 
   // Fetch settings on component mount
   useEffect(() => {
@@ -127,7 +130,15 @@ const RegisterInstitute = () => {
       const response = await fetch('/api/settings');
       if (response.ok) {
         const data = await response.json();
-        setSettings(data);
+        // Handle both old and new response formats
+        if (data.success && data.settings) {
+          setSettings(data.settings);
+        } else if (data.paidRegistration !== undefined) {
+          // Old format - direct settings object
+          setSettings(data);
+        } else {
+          console.error('Unexpected settings response format:', data);
+        }
       }
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -343,8 +354,7 @@ const RegisterInstitute = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
+    
     // Basic validation
     const validationErrors = [];
 
@@ -416,9 +426,18 @@ const RegisterInstitute = () => {
         description: validationErrors.join(', '),
         variant: "destructive",
       });
-      setIsSubmitting(false);
       return;
     }
+
+    // Start submission process
+    setIsSubmitting(true);
+    
+    // Show loading toast
+    setLoadingToastData({
+      title: "Processing Registration",
+      description: "Please wait while we process your institute registration..."
+    });
+    setShowLoadingToast(true);
 
     // Check if paid registration is enabled
     if (settings?.paidRegistration) {
@@ -430,7 +449,13 @@ const RegisterInstitute = () => {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    // Prevent any form submission
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     const tabs = ["basic", "excellence", "contact", "courses", "faculty", "facilities", "placements"];
     const currentIndex = tabs.indexOf(activeTab);
     if (currentIndex < tabs.length - 1) {
@@ -438,7 +463,13 @@ const RegisterInstitute = () => {
     }
   };
 
-  const handlePrevious = () => {
+  const handlePrevious = (e?: React.MouseEvent) => {
+    // Prevent any form submission
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     const tabs = ["basic", "excellence", "contact", "courses", "faculty", "facilities", "placements"];
     const currentIndex = tabs.indexOf(activeTab);
     if (currentIndex > 0) {
@@ -469,38 +500,40 @@ const RegisterInstitute = () => {
         },
       };
 
-      // Initialize payment but don't open automatically
+      // Update loading toast
+      setLoadingToastData({
+        title: "Initializing Payment",
+        description: `Setting up payment gateway for ₹${settings?.registrationFee || 50}...`
+      });
+
+      // Initialize payment
       const paymentInstance: InstitutePaymentInstance = await initiateInstitutePayment(paymentOptions);
       
-      // Show confirmation dialog before opening payment
-      const shouldProceed = window.confirm(
-        `You are about to proceed with payment of ₹${settings?.registrationFee || 50} for institute registration. Do you want to continue?`
-      );
-      
-      if (!shouldProceed) {
-        setIsPaymentProcessing(false);
-        return;
-      }
-
-      // Store the payment instance for manual opening
+      // Store the payment instance
       setPaymentInstance(paymentInstance);
       
-      // Show success message that payment is ready
+      // Hide loading toast and show success message
+      setShowLoadingToast(false);
+      setIsSubmitting(false);
+      setIsPaymentProcessing(false);
+      
       toast({
         title: "Payment Ready",
-        description: "Payment system is ready. Click 'Open Payment' to proceed.",
+        description: `Payment system is ready. Click 'Open Payment' to proceed with ₹${settings?.registrationFee || 50} payment.`,
         variant: "default",
       });
       
-      setIsPaymentProcessing(false);
     } catch (error: any) {
-      // Show proper toast messages instead of console errors
+      // Hide loading toast and show error
+      setShowLoadingToast(false);
+      setIsSubmitting(false);
+      setIsPaymentProcessing(false);
+      
       toast({
         title: "Registration Error",
         description: error.message || 'Something went wrong during registration. Please try again.',
         variant: "destructive",
       });
-      setIsPaymentProcessing(false);
     }
   };
 
@@ -515,61 +548,82 @@ const RegisterInstitute = () => {
     }
 
     setIsPaymentProcessing(true);
+    
+    // Show loading toast for payment processing
+    setLoadingToastData({
+      title: "Processing Payment",
+      description: "Please complete the payment in the popup window..."
+    });
+    setShowLoadingToast(true);
+    
     try {
       // Now open the payment modal manually
       const result = await paymentInstance.openPayment();
       
       if (result && typeof result === 'object' && 'success' in result && result.success) {
         const paymentResult = result as any;
-        setIsSuccess(true);
-        setRegistrationId(paymentResult.registrationId || '');
         
-        // Store success data before showing overlay
-        setSuccessData({
-          instituteName: formData.name,
-          registrationId: paymentResult.registrationId || '',
-          paymentId: paymentResult.paymentId || ''
-        });
-        
-        // Show success overlay
-        setShowSuccessOverlay(true);
-        
-        toast({
+        // Update loading toast to success
+        setLoadingToastData({
           title: "Registration Successful!",
-          description: `Your institute registration has been completed successfully. Payment ID: ${paymentResult.paymentId}`,
-          variant: "default",
+          description: "Your institute has been registered successfully."
         });
+        
+        // Show success state briefly
+        setTimeout(() => {
+          setShowLoadingToast(false);
+          setIsSuccess(true);
+          setRegistrationId(paymentResult.registrationId || '');
+          
+          // Store success data before showing overlay
+          setSuccessData({
+            instituteName: formData.name,
+            registrationId: paymentResult.registrationId || '',
+            paymentId: paymentResult.paymentId || ''
+          });
+          
+          // Show success overlay
+          setShowSuccessOverlay(true);
+          
+          toast({
+            title: "Registration Successful!",
+            description: `Your institute registration has been completed successfully. Payment ID: ${paymentResult.paymentId}`,
+            variant: "default",
+          });
 
-        // Automatically log in the user
-        const storeUser = {
-          id: paymentResult.registrationId || '',
-          firstName: formData.name,
-          lastName: '',
-          email: formData.email,
-          role: 'institute',
-          type: 'institute',
-          instituteName: formData.name,
-          phone: formData.phone,
-          address: formData.address,
-          website: formData.website,
-          city: formData.city,
-          state: formData.state
-        };
-        loginStore(storeUser as any);
+          // Automatically log in the user
+          const storeUser = {
+            id: paymentResult.registrationId || '',
+            firstName: formData.name,
+            lastName: '',
+            email: formData.email,
+            role: 'institute',
+            type: 'institute',
+            instituteName: formData.name,
+            phone: formData.phone,
+            address: formData.address,
+            website: formData.website,
+            city: formData.city,
+            state: formData.state
+          };
+          loginStore(storeUser as any);
 
-        // Persist minimal identity in localStorage
-        try {
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('fp_user_email', storeUser.email || '');
-            window.localStorage.setItem('fp_user_name', storeUser.instituteName || '');
-          }
-        } catch {}
+          // Persist minimal identity in localStorage
+          try {
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem('fp_user_email', storeUser.email || '');
+              window.localStorage.setItem('fp_user_name', storeUser.instituteName || '');
+            }
+          } catch {}
 
-        // Refresh the page immediately after successful payment
-        window.location.reload();
+          // Refresh the page immediately after successful payment
+          window.location.reload();
+        }, 2000);
       }
     } catch (error: any) {
-      // Show proper toast messages instead of console errors
+      // Hide loading toast and show error
+      setShowLoadingToast(false);
+      
       if (error.message === 'Payment failed') {
         toast({
           title: "Payment Failed",
@@ -598,6 +652,12 @@ const RegisterInstitute = () => {
   };
 
   const handleFreeRegistration = async () => {
+    // Update loading toast
+    setLoadingToastData({
+      title: "Submitting Registration",
+      description: "Saving your institute information to our database..."
+    });
+
     // Create registration data
     const registrationData = {
       ...formData,
@@ -622,99 +682,112 @@ const RegisterInstitute = () => {
         throw new Error(data.error || 'Failed to submit registration');
       }
 
-      setIsSuccess(true);
-      setRegistrationId(registrationData.registrationId);
-      toast({
-        title: "Registration Submitted Successfully!",
-        description: `Your institute registration (ID: ${registrationData.registrationId}) has been submitted for review. Welcome to EduPath!`,
-        variant: "default",
+      // Update loading toast to success
+      setLoadingToastData({
+        title: "Registration Successful!",
+        description: "Your institute has been registered successfully."
       });
 
-      // Automatically log in the user
-      if (data?.user) {
-        const u = data.user;
-        const storeUser = {
-          id: u.id || '',
-          firstName: u.firstName || '',
-          lastName: u.lastName || '',
-          email: u.email || '',
-          role: u.role || 'institute',
-          type: u.type || 'institute',
-          instituteName: u.instituteName || '',
-          phone: u.phone || '',
-          address: u.address || '',
-          website: u.website || '',
-          city: u.city || '',
-          state: u.state || ''
-        };
-        loginStore(storeUser as any);
+      // Show success state briefly
+      setTimeout(() => {
+        setShowLoadingToast(false);
+        setIsSuccess(true);
+        setRegistrationId(registrationData.registrationId);
+        
+        toast({
+          title: "Registration Submitted Successfully!",
+          description: `Your institute registration (ID: ${registrationData.registrationId}) has been submitted for review. Welcome to FuturePath!`,
+          variant: "default",
+        });
 
-        // Persist minimal identity in localStorage for quick detection
-        try {
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('fp_user_email', storeUser.email || '');
-            const fullName = storeUser.instituteName || storeUser.firstName || '';
-            window.localStorage.setItem('fp_user_name', fullName);
-          }
-        } catch {}
-      }
-      
-      // Redirect to home page as logged-in user
-      router.push('/');
+        // Automatically log in the user
+        if (data?.user) {
+          const u = data.user;
+          const storeUser = {
+            id: u.id || '',
+            firstName: u.firstName || '',
+            lastName: u.lastName || '',
+            email: u.email || '',
+            role: u.role || 'institute',
+            type: u.type || 'institute',
+            instituteName: u.instituteName || '',
+            phone: u.phone || '',
+            address: u.address || '',
+            website: u.website || '',
+            city: u.city || '',
+            state: u.state || ''
+          };
+          loginStore(storeUser as any);
 
-      // Reset all form data
-      setFormData({
-        // Basic Information
-        name: '',
-        type: '',
-        city: '',
-        state: '',
-        description: '',
-        established: '',
-        website: '',
+          // Persist minimal identity in localStorage for quick detection
+          try {
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem('fp_user_email', storeUser.email || '');
+              const fullName = storeUser.instituteName || storeUser.firstName || '';
+              window.localStorage.setItem('fp_user_name', fullName);
+            }
+          } catch {}
+        }
         
-        // SEO/Discovery
-        keywords: [],
-        
-        // Contact Information
-        phone: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        address: '',
-        
-        // Institution Details
-        totalStudents: '',
-        accreditations: [],
-        nirfRanking: '',
-        qsRanking: '',
-        timesRanking: '',
-        
-        // Excellence in Education
-        excellenceInEducation: '',
-        
-        // Placement Information
-        placementRate: '',
-        averagePackage: '',
-        highestPackage: '',
-        
-        // Media
-        logoDataUrl: '',
-        imageDataUrls: []
-      });
+        // Redirect to home page as logged-in user
+        router.push('/');
 
-      // Reset dynamic arrays
-      setCourses([{ name: '', duration: '', fees: '', seats: '', cutoff: '', viewDetailsLink: '', applyNowLink: '' }]);
-      setFaculty([{ name: '', position: '', specialization: '', experience: '', publications: '', avatarDataUrl: '' }]);
-      setFacilities(['']);
-      setRecruiters([{ name: '', logoDataUrl: '' }]);
+        // Reset all form data
+        setFormData({
+          // Basic Information
+          name: '',
+          type: '',
+          city: '',
+          state: '',
+          description: '',
+          established: '',
+          website: '',
+          
+          // SEO/Discovery
+          keywords: [],
+          
+          // Contact Information
+          phone: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          address: '',
+          
+          // Institution Details
+          totalStudents: '',
+          accreditations: [],
+          nirfRanking: '',
+          qsRanking: '',
+          timesRanking: '',
+          
+          // Excellence in Education
+          excellenceInEducation: '',
+          
+          // Placement Information
+          placementRate: '',
+          averagePackage: '',
+          highestPackage: '',
+          
+          // Media
+          logoDataUrl: '',
+          imageDataUrls: []
+        });
 
-      // Reset active tab to basic info
-      setActiveTab("basic");
-      // Clear file inputs
-      setFileResetKey(prev => prev + 1);
+        // Reset dynamic arrays
+        setCourses([{ name: '', duration: '', fees: '', seats: '', cutoff: '', viewDetailsLink: '', applyNowLink: '' }]);
+        setFaculty([{ name: '', position: '', specialization: '', experience: '', publications: '', avatarDataUrl: '' }]);
+        setFacilities(['']);
+        setRecruiters([{ name: '', logoDataUrl: '' }]);
+
+        // Reset active tab to basic info
+        setActiveTab("basic");
+        // Clear file inputs
+        setFileResetKey(prev => prev + 1);
+      }, 2000);
       
     } catch (error) {
+      // Hide loading toast and show error
+      setShowLoadingToast(false);
       console.error('Error saving registration:', error);
       toast({
         title: "Error",
@@ -728,12 +801,7 @@ const RegisterInstitute = () => {
 
 
 
-  const handleSubmitClick = () => {
-    const form = document.getElementById('instituteForm') as HTMLFormElement | null;
-    if (form) {
-      form.requestSubmit();
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -1541,6 +1609,7 @@ const RegisterInstitute = () => {
                         type="button" 
                         onClick={handleNext}
                         className="bg-primary hover:bg-primary/90"
+                        disabled={isSubmitting}
                       >
                         Next →
                       </Button>
@@ -1586,6 +1655,16 @@ const RegisterInstitute = () => {
       </section>
 
       <Footer />
+
+      {/* Loading Toast */}
+      {showLoadingToast && (
+        <LoadingToast
+          title={loadingToastData.title}
+          description={loadingToastData.description}
+          isLoading={!isSuccess}
+          isSuccess={isSuccess}
+        />
+      )}
 
       {/* Success Overlay */}
       {showSuccessOverlay && (

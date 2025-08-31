@@ -276,7 +276,9 @@ export async function POST(request: NextRequest) {
       success: true, 
       id: String(result.insertedId),
       user: userData,
-      message: 'Institute registration submitted successfully'
+      message: 'Institute registration submitted successfully',
+      registrationId: doc.registrationId,
+      status: status
     }, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
