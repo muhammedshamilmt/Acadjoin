@@ -696,7 +696,7 @@ const RegisterInstitute = () => {
         
         toast({
           title: "Registration Submitted Successfully!",
-          description: `Your institute registration (ID: ${registrationData.registrationId}) has been submitted for review. Welcome to FuturePath!`,
+          description: `Your institute registration (ID: ${registrationData.registrationId}) has been submitted for review. Welcome to Acadjoin!`,
           variant: "default",
         });
 
@@ -1679,7 +1679,7 @@ const RegisterInstitute = () => {
             </h2>
             
             <p className="text-gray-600 mb-6">
-              Your institute has been successfully registered. Welcome to FuturePath!
+              Your institute has been successfully registered. Welcome to Acadjoin!
             </p>
             
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">

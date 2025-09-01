@@ -52,7 +52,7 @@ const About = () => {
     {
       name: 'Muhammed Shamil MT',
       role: 'Founder & CEO',
-      bio: 'Founder of _______ ,A BCA student from kerala',
+      bio: 'Founder of  Acadjoin,A BCA student from kerala',
       image: '/api/placeholder/150/150'
     },
     {
@@ -82,7 +82,7 @@ const About = () => {
         <div className="container mx-auto px-8 relative">
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <Badge className="bg-primary/10 text-primary border-primary/20 px-4 py-2">
-              About EduPath
+              About Acadjoin
             </Badge>
             
             <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
@@ -149,7 +149,7 @@ const About = () => {
 
             <div className="space-y-8 text-lg text-muted-foreground leading-relaxed">
               <p>
-                EduPath was founded in 2023 when our team realized that despite India having 
+                Acadjoin was founded in 2023 when our team realized that despite India having 
                 world-class educational institutions, students often lacked access to authentic, 
                 unbiased information about these institutions. Too many bright minds were making 
                 suboptimal choices simply due to lack of proper guidance.
@@ -257,7 +257,7 @@ const About = () => {
               Ready to Start Your Educational Journey?
             </h2>
             <p className="text-xl text-muted-foreground">
-              Join thousands of students who have found their perfect educational match with EduPath
+              Join thousands of students who have found their perfect educational match with Acadjoin
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">

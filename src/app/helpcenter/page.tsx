@@ -70,24 +70,24 @@ const HelpCenter = () => {
 
   const faqs = [
     {
-      question: "How do I search for institutes on EduPath?",
+      question: "How do I search for institutes on Acadjoin?",
       answer: "You can search for institutes using our search bar on the homepage or institutes page. Filter by location, course type, fees, and ratings to find the perfect match for your needs."
     },
     {
-      question: "Are the reviews on EduPath authentic?",
-      answer: "Yes, all reviews on EduPath are verified. We have a strict verification process where reviewers must provide proof of enrollment or attendance at the institution they're reviewing."
+      question: "Are the reviews on Acadjoin authentic?",
+      answer: "Yes, all reviews on Acadjoin are verified. We have a strict verification process where reviewers must provide proof of enrollment or attendance at the institution they're reviewing."
     },
     {
-      question: "How can I add my institute to EduPath?",
+      question: "How can I add my institute to Acadjoin?",
       answer: "Institute administrators can register their institutions through our 'Add Institute' portal. We verify all institutional information before listing to ensure accuracy and authenticity."
     },
     {
       question: "Can I connect with current students or alumni?",
-      answer: "Absolutely! EduPath facilitates connections between prospective students and current students/alumni through our mentorship program and community forums."
+      answer: "Absolutely! Acadjoin facilitates connections between prospective students and current students/alumni through our mentorship program and community forums."
     },
     {
-      question: "Is EduPath free to use?",
-      answer: "Yes, EduPath is completely free for students. You can search institutes, read reviews, and connect with mentors at no cost. Some premium features may be available for institutions."
+      question: "Is Acadjoin free to use?",
+      answer: "Yes, Acadjoin is completely free for students. You can search institutes, read reviews, and connect with mentors at no cost. Some premium features may be available for institutions."
     },
     {
       question: "How do I report inappropriate content or reviews?",
@@ -275,14 +275,14 @@ const HelpCenter = () => {
         <div className="container mx-auto px-8">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl font-bold text-foreground mb-4">Additional Resources</h2>
-            <p className="text-muted-foreground mb-8">More ways to get the most out of EduPath</p>
+            <p className="text-muted-foreground mb-8">More ways to get the most out of Acadjoin</p>
             
             <div className="grid md:grid-cols-3 gap-6">
               <Card className="text-center hover:shadow-lg transition-all duration-300">
                 <CardContent className="p-6">
                   <FileText className="w-12 h-12 text-primary mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">User Guide</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Complete guide to using EduPath</p>
+                  <p className="text-sm text-muted-foreground mb-4">Complete guide to using Acadjoin</p>
                   <Button variant="outline" size="sm">Download PDF</Button>
                 </CardContent>
               </Card>

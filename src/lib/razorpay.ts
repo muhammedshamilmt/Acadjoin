@@ -105,7 +105,7 @@ export const initiatePayment = async (options: PaymentOptions) => {
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_uygrrtKtEWuv1x',
       amount: orderResponse.order.amount,
       currency: orderResponse.order.currency,
-      name: 'FuturePath',
+      name: 'Acadjoin',
       description: `Quick Connect with ${options.userName}`,
       order_id: orderResponse.order.id,
              prefill: {

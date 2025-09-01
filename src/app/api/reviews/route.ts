@@ -2,35 +2,113 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCollection } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
-// GET - Fetch reviews (optionally filtered by institute)
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+// GET - Retrieve all reviews with pagination and optimization
 export async function GET(request: NextRequest) {
   try {
-    console.log('Fetching reviews from database...');
-    const { searchParams } = new URL(request.url);
-    const institute = searchParams.get('institute');
-    const userEmail = searchParams.get('userEmail');
+    console.log('Reviews API: GET request received');
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
     
-    const reviewsCollection = await getCollection('reviews');
-    console.log('Collection obtained, finding documents...');
-
-    let query: any = {};
-    if (institute) query.institute = institute;
-    if (userEmail) query.userEmail = userEmail;
-    
-    const reviews = await reviewsCollection.find(query).sort({ createdAt: -1 }).toArray();
-    console.log(`Found ${reviews.length} reviews${institute ? ` for institute ${institute}` : ''}${userEmail ? ` for user ${userEmail}` : ''}`);
-
-    // Return empty array if no reviews found (no sample data creation)
-    if (reviews.length === 0) {
-      console.log('No reviews found');
-      return NextResponse.json({ success: true, reviews: [] }, { status: 200 });
+    let collection;
+    try {
+      collection = await getCollection('reviews');
+      console.log('Reviews API: Database connection successful');
+    } catch (dbError) {
+      console.error('Reviews API: Database connection failed:', dbError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Database connection failed',
+          details: dbError instanceof Error ? dbError.message : 'Unknown database error'
+        },
+        { status: 500 }
+      );
     }
-
-    return NextResponse.json({ success: true, reviews }, { status: 200 });
+    
+    try {
+      // Get total count for pagination
+      const totalCount = await collection.countDocuments({});
+      
+      // Get reviews with pagination and optimized projection
+      const reviews = await collection
+        .find({})
+        .project({
+          _id: 1,
+          userId: 1,
+          userEmail: 1,
+          userRole: 1,
+          rating: 1,
+          title: 1,
+          content: 1,
+          course: 1,
+          year: 1,
+          institute: 1,
+          likes: 1,
+          helpful: 1,
+          verified: 1,
+          tags: 1,
+          createdAt: 1,
+          updatedAt: 1
+        })
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+      
+      console.log('Reviews API: Database query successful');
+      console.log('Reviews API: Found reviews:', reviews.length);
+      
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+      
+      const pagination = {
+        page,
+        limit,
+        totalPages,
+        totalCount,
+        hasNextPage,
+        hasPrevPage
+      };
+      
+      const response = { 
+        success: true,
+        reviews,
+        pagination
+      };
+      
+      // Set cache headers for better performance
+      const responseObj = NextResponse.json(response);
+      responseObj.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      responseObj.headers.set('ETag', `"${Date.now()}-${totalCount}"`);
+      
+      return responseObj;
+    } catch (queryError) {
+      console.error('Reviews API: Database query failed:', queryError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Failed to query reviews from database',
+          details: queryError instanceof Error ? queryError.message : 'Unknown query error'
+        },
+        { status: 500 }
+      );
+    }
   } catch (error) {
-    console.error('Error fetching reviews:', error);
+    console.error('Reviews API: Unexpected error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch reviews', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        success: false,
+        error: 'Unexpected error occurred',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

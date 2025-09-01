@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { getCollection } from '@/lib/mongodb';
+import { validateEmail } from '@/lib/email-validation';
 
-// GET - Retrieve all people registrations with statistics
-export async function GET() {
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+// GET - Retrieve all people registrations with pagination and optimization
+export async function GET(request: NextRequest) {
   try {
     console.log('People Registration API: GET request received');
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
     
     let collection;
     try {
@@ -23,39 +33,69 @@ export async function GET() {
     }
     
     try {
-      // Get all registrations
-      const registrations = await collection.find({}).toArray();
+      // Get total count for pagination
+      const totalCount = await collection.countDocuments({});
+      
+      // Get registrations with pagination and optimized projection
+      const registrations = await collection
+        .find({})
+        .project({
+          _id: 1,
+          firstName: 1,
+          lastName: 1,
+          email: 1,
+          phone: 1,
+          dateOfBirth: 1,
+          gender: 1,
+          location: 1,
+          bio: 1,
+          studiedInstitution: 1,
+          profilePicture: 1,
+          careerGoals: 1,
+          expectedSalary: 1,
+          averageResponseTime: 1,
+          interestedFields: 1,
+          preferredLocations: 1,
+          skills: 1,
+          specializations: 1,
+          achievements: 1,
+          createdAt: 1,
+          updatedAt: 1
+        })
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+      
       console.log('People Registration API: Database query successful');
       console.log('People Registration API: Found registrations:', registrations.length);
       
-      // Log all status values for debugging
-      const allStatuses = registrations.map(reg => reg.status);
-      console.log('People Registration API: All statuses found:', [...new Set(allStatuses)]);
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
       
-      // Calculate statistics
-      const total = registrations.length;
-      const active = registrations.filter(reg => reg.status === 'active').length;
-      const inactive = registrations.filter(reg => reg.status === 'inactive').length;
-      const pending = registrations.filter(reg => reg.status === 'pending').length;
-      const approved = registrations.filter(reg => reg.status === 'approved').length;
-      const rejected = registrations.filter(reg => reg.status === 'rejected').length;
-      
-      const statistics = {
-        total,
-        active,
-        inactive,
-        pending,
-        approved,
-        rejected
+      const pagination = {
+        page,
+        limit,
+        totalPages,
+        totalCount,
+        hasNextPage,
+        hasPrevPage
       };
       
-      console.log('People Registration API: Statistics calculated:', statistics);
-      
-      return NextResponse.json({ 
+      const response = { 
         success: true,
         registrations,
-        statistics
-      });
+        pagination
+      };
+      
+      // Set cache headers for better performance
+      const responseObj = NextResponse.json(response);
+      responseObj.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      responseObj.headers.set('ETag', `"${Date.now()}-${totalCount}"`);
+      
+      return responseObj;
     } catch (queryError) {
       console.error('People Registration API: Database query failed:', queryError);
       return NextResponse.json(

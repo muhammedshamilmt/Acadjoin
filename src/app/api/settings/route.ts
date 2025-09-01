@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
           passwordMinLength: "8",
           
           // General Settings
-          siteName: "FuturePath",
+          siteName: "Acadjoin",
           siteDescription: "Educational platform connecting students and institutes",
           maintenanceMode: false,
           debugMode: false,
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       passwordMinLength: settings.passwordMinLength?.toString() ?? "8",
       
       // General Settings
-      siteName: settings.siteName ?? "FuturePath",
+      siteName: settings.siteName ?? "Acadjoin",
       siteDescription: settings.siteDescription ?? "Educational platform connecting students and institutes",
       maintenanceMode: settings.maintenanceMode ?? false,
       debugMode: settings.debugMode ?? false,

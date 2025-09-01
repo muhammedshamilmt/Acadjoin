@@ -195,7 +195,7 @@ export default function Login() {
 
       if (isNewUser) {
         // New user from login page - redirect to home (they can complete profile later)
-        toast.success('Account created successfully! Welcome to EduPath.')
+        toast.success('Account created successfully! Welcome to Acadjoin.')
         router.push('/')
       } else {
         // Existing user - redirect to home
@@ -239,7 +239,7 @@ export default function Login() {
                 <div className="w-10 h-10 bg-gradient-to-br from-navy-900 to-coral-500 rounded-lg flex items-center justify-center">
                   <BookOpen className="h-6 w-6 text-white" />
                 </div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-navy-900 to-coral-500 bg-clip-text text-transparent">EduPath</h1>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-navy-900 to-coral-500 bg-clip-text text-transparent">Acadjoin</h1>
               </div>
               <div>
                 <h2 className="text-3xl font-bold">Welcome back</h2>
@@ -380,7 +380,7 @@ export default function Login() {
         {/* Additional info */}
         <div className="text-center mt-8 space-y-2">
           <p className="text-sm text-muted-foreground">
-            🎓 Join 10,000+ students already using EduPath
+            🎓 Join 10,000+ students already using Acadjoin
           </p>
           <p className="text-xs text-muted-foreground/70">
             Trusted by students across Kerala & India

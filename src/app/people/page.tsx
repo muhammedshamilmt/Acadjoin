@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { PageLoader } from '@/components/ui/loading-spinner';
 import QuickConnectModal from '@/components/QuickConnectModal';
+import { usePaginatedFetch } from '@/hooks/useOptimizedFetch';
 
 interface PeopleRegistration {
   _id: string;
@@ -49,75 +50,56 @@ interface PeopleRegistration {
 }
 
 const People = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedInstitute, setSelectedInstitute] = useState('');
-  const [people, setPeople] = useState<PeopleRegistration[]>([]);
-  const [filteredPeople, setFilteredPeople] = useState<PeopleRegistration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showQuickConnectModal, setShowQuickConnectModal] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<PeopleRegistration | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  // Fetch people registrations from API
+  // Use optimized paginated fetch hook
+  const {
+    data: people,
+    loading,
+    error,
+    pagination,
+    page,
+    limit,
+    searchQuery,
+    goToPage,
+    changeLimit,
+    updateSearch,
+  } = usePaginatedFetch<PeopleRegistration[]>('/api/people-registration', 1, 20, {
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Mark as loaded on first data or error
   useEffect(() => {
-    const fetchPeople = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const response = await fetch('/api/people-registration');
-        if (!response.ok) {
-          throw new Error('Failed to fetch people data');
-        }
-        
-        const data = await response.json();
-        console.log('Fetched people data:', data);
-        if (data.registrations && Array.isArray(data.registrations)) {
-          console.log('People registrations:', data.registrations);
-          setPeople(data.registrations);
-          setFilteredPeople(data.registrations);
-        } else {
-          setPeople([]);
-          setFilteredPeople([]);
-        }
-      } catch (err) {
-        console.error('Error fetching people:', err);
-        setError('Failed to load people data. Please try again later.');
-        setPeople([]);
-        setFilteredPeople([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchPeople();
-  }, []);
+    if (!hasLoadedOnce && (Array.isArray(people) || error)) {
+      setHasLoadedOnce(true);
+    }
+  }, [people, error, hasLoadedOnce]);
 
   // Filter people based on search and filters
-  useEffect(() => {
-    const filtered = people.filter(person => {
-      const fullName = `${person.firstName} ${person.lastName}`.toLowerCase();
-      const matchesSearch = fullName.includes(searchQuery.toLowerCase()) ||
-                           person.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                           person.specializations.some(spec => spec.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                           person.location.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesRole = selectedRole === '' || selectedRole === 'All Roles' || 
-                          (selectedRole === 'Student Mentor' && person.interestedFields.includes('Student Mentoring')) ||
-                          (selectedRole === 'Alumni Mentor' && person.interestedFields.includes('Alumni Mentoring')) ||
-                          (selectedRole === 'Academic Counselor' && person.interestedFields.includes('Academic Counseling')) ||
-                          (selectedRole === 'Career Counselor' && person.interestedFields.includes('Career Counseling')) ||
-                          (selectedRole === 'Industry Expert' && person.interestedFields.includes('Industry Expert'));
-      
-      const matchesInstitute = selectedInstitute === '' || selectedInstitute === 'All Institutes' || 
-                              person.location.toLowerCase().includes(selectedInstitute.toLowerCase());
-      
-      return matchesSearch && matchesRole && matchesInstitute;
-    });
+  const filteredPeople = (people || []).filter(person => {
+    const fullName = `${person.firstName} ${person.lastName}`.toLowerCase();
+    const matchesSearch = fullName.includes(searchQuery.toLowerCase()) ||
+                         person.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         person.specializations.some(spec => spec.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         person.location.toLowerCase().includes(searchQuery.toLowerCase());
     
-    setFilteredPeople(filtered);
-  }, [people, searchQuery, selectedRole, selectedInstitute]);
+    const matchesRole = selectedRole === '' || selectedRole === 'All Roles' || 
+                        (selectedRole === 'Student Mentor' && person.interestedFields.includes('Student Mentoring')) ||
+                        (selectedRole === 'Alumni Mentor' && person.interestedFields.includes('Alumni Mentoring')) ||
+                        (selectedRole === 'Academic Counselor' && person.interestedFields.includes('Academic Counseling')) ||
+                        (selectedRole === 'Career Counselor' && person.interestedFields.includes('Career Counseling')) ||
+                        (selectedRole === 'Industry Expert' && person.interestedFields.includes('Industry Expert'));
+    
+    const matchesInstitute = selectedInstitute === '' || selectedInstitute === 'All Institutes' || 
+                            person.location.toLowerCase().includes(selectedInstitute.toLowerCase());
+    
+    return matchesSearch && matchesRole && matchesInstitute;
+  });
 
   const roles = ["All Roles", "Student Mentor", "Alumni Mentor", "Academic Counselor", "Career Counselor", "Industry Expert"];
   const institutes = ["All Institutes", "IIT Kerala", "KIMS Kochi", "IIM Kozhikode", "NID Kerala", "CUSAT", "Multiple Institutions"];
@@ -147,7 +129,7 @@ const People = () => {
     return responseTime;
   };
 
-  if (isLoading) {
+  if (loading && !hasLoadedOnce) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -157,7 +139,7 @@ const People = () => {
     );
   }
 
-  if (error) {
+  if (error && !hasLoadedOnce) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -211,7 +193,7 @@ const People = () => {
                 <Input
                   placeholder="Search mentors by name, skills, or location..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => updateSearch(e.target.value)}
                   className="pl-12 h-12 text-base"
                 />
               </div>
@@ -237,7 +219,7 @@ const People = () => {
             </div>
 
             <div className="mt-4 text-sm text-muted-foreground">
-              Showing {filteredPeople.length} of {people.length} mentors
+              Showing {filteredPeople.length} of {(people || []).length} mentors
             </div>
           </div>
         </div>
@@ -269,6 +251,7 @@ const People = () => {
                               target.style.display = 'none';
                               target.nextElementSibling?.classList.remove('hidden');
                             }}
+                            loading="lazy"
                           />
                           <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full flex items-center justify-center hidden">
                             <GraduationCap className="w-8 h-8 text-primary" />

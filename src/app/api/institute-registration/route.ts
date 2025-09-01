@@ -9,19 +9,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// GET - Retrieve all institute registrations with statistics
+// GET - Retrieve all institute registrations with statistics and pagination
 export async function GET(request: NextRequest) {
   try {
     console.log('Institute Registration API: GET request received');
     const url = new URL(request.url);
     const q = (url.searchParams.get('q') || '').trim();
     const suggest = url.searchParams.get('suggest');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limit = parseInt(url.searchParams.get('limit') || '12');
+    const skip = (page - 1) * limit;
     
     let collection;
-         try {
-       collection = await getCollection('instituteRegistrations');
-       console.log('Institute Registration API: Database connection successful');
-     } catch (dbError) {
+    try {
+      collection = await getCollection('instituteRegistrations');
+      console.log('Institute Registration API: Database connection successful');
+    } catch (dbError) {
       console.error('Institute Registration API: Database connection failed:', dbError);
       return NextResponse.json(
         { 
@@ -33,76 +36,161 @@ export async function GET(request: NextRequest) {
       );
     }
     
-         try {
-       // Build optional search filter
-       let filter: any = {};
-       if (q) {
-         const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-         filter = {
-           $or: [
-             { name: regex },
-             { type: regex },
-             { city: regex },
-             { state: regex },
-             { description: regex },
-             { accreditations: regex },
-             { keywords: regex },
-             { 'courses.name': regex }
-           ]
-         };
-       }
+    try {
+      // Build optional search filter
+      let filter: any = {};
+      if (q) {
+        const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        filter = {
+          $or: [
+            { name: regex },
+            { type: regex },
+            { city: regex },
+            { state: regex },
+            { description: regex },
+            { accreditations: regex },
+            { keywords: regex },
+            { 'courses.name': regex }
+          ]
+        };
+      }
 
-       // Suggestions mode: return matching keyword suggestions only
-       if (suggest) {
-         const registrationsForSuggest = await collection.find(q ? filter : {}).project({ keywords: 1 }).toArray();
-         const keywordSet = new Set<string>();
-         for (const doc of registrationsForSuggest) {
-           const kws = Array.isArray(doc.keywords) ? doc.keywords : [];
-           for (const kw of kws) {
-             if (typeof kw === 'string') {
-               if (!q || kw.toLowerCase().includes(q.toLowerCase())) {
-                 keywordSet.add(kw);
-               }
-             }
-           }
-         }
-         const suggestions = Array.from(keywordSet).slice(0, 10);
-         return NextResponse.json({ success: true, suggestions });
-       }
+      // Suggestions mode: return matching keyword suggestions only
+      if (suggest) {
+        const registrationsForSuggest = await collection
+          .find(q ? filter : {})
+          .project({ keywords: 1 })
+          .limit(50) // Limit suggestions for performance
+          .toArray();
+        
+        const keywordSet = new Set<string>();
+        for (const doc of registrationsForSuggest) {
+          const kws = Array.isArray(doc.keywords) ? doc.keywords : [];
+          for (const kw of kws) {
+            if (typeof kw === 'string') {
+              if (!q || kw.toLowerCase().includes(q.toLowerCase())) {
+                keywordSet.add(kw);
+              }
+            }
+          }
+        }
+        const suggestions = Array.from(keywordSet).slice(0, 10);
+        return NextResponse.json({ success: true, suggestions });
+      }
 
-       // Get registrations (optionally filtered)
-       const registrations = await collection.find(filter).toArray();
-       console.log('Institute Registration API: Database query successful');
-       console.log('Institute Registration API: Found registrations:', registrations.length);
-       
-       // Log all status values for debugging
-       const allStatuses = registrations.map(reg => reg.status);
-       console.log('Institute Registration API: All statuses found:', [...new Set(allStatuses)]);
-       
-       // Calculate statistics
-       const total = registrations.length;
-       const pending = registrations.filter(reg => reg.status === 'pending').length;
-       const rejected = registrations.filter(reg => reg.status === 'rejected').length;
-       const approved = registrations.filter(reg => reg.status === 'approved').length;
-       const submitted = registrations.filter(reg => reg.status === 'submitted').length;
-       const draft = registrations.filter(reg => reg.status === 'draft').length;
+      // Get total count for pagination
+      const totalCount = await collection.countDocuments(filter);
       
-      const statistics = {
-        total,
-        pending,
-        rejected,
-        approved,
-        submitted,
-        draft
+      // Get registrations with pagination and optimized projection
+      const registrations = await collection
+        .find(filter)
+        .project({
+          _id: 1,
+          name: 1,
+          type: 1,
+          city: 1,
+          state: 1,
+          description: 1,
+          established: 1,
+          website: 1,
+          phone: 1,
+          email: 1,
+          address: 1,
+          totalStudents: 1,
+          accreditations: 1,
+          nirfRanking: 1,
+          qsRanking: 1,
+          timesRanking: 1,
+          placementRate: 1,
+          averagePackage: 1,
+          highestPackage: 1,
+          excellenceInEducation: 1,
+          viewDetailsLink: 1,
+          applyNowLink: 1,
+          logoDataUrl: 1,
+          imageDataUrls: 1,
+          courses: 1,
+          faculty: 1,
+          facilities: 1,
+          recruiters: 1,
+          alumni: 1,
+          status: 1,
+          registrationId: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          keywords: 1
+        })
+        .sort({ createdAt: -1 }) // Sort by newest first
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+      
+      console.log('Institute Registration API: Database query successful');
+      console.log('Institute Registration API: Found registrations:', registrations.length);
+      
+      // Calculate pagination info
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+      
+      const pagination = {
+        page,
+        limit,
+        totalPages,
+        totalCount,
+        hasNextPage,
+        hasPrevPage
       };
+      
+      // Log all status values for debugging
+      const allStatuses = registrations.map(reg => reg.status);
+      console.log('Institute Registration API: All statuses found:', [...new Set(allStatuses)]);
+      
+      // Calculate statistics (only for first page to improve performance)
+      let statistics = null;
+      if (page === 1) {
+        const total = totalCount;
+        const statusPipeline = [
+          { $match: filter },
+          {
+            $group: {
+              _id: '$status',
+              count: { $sum: 1 }
+            }
+          }
+        ];
+        
+        const statusCounts = await collection.aggregate(statusPipeline).toArray();
+        const statusMap = statusCounts.reduce((acc: any, item: any) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {});
+        
+        statistics = {
+          total,
+          pending: statusMap.pending || 0,
+          rejected: statusMap.rejected || 0,
+          approved: statusMap.approved || 0,
+          submitted: statusMap.submitted || 0,
+          draft: statusMap.draft || 0
+        };
+      }
       
       console.log('Institute Registration API: Statistics calculated:', statistics);
       
-      return NextResponse.json({ 
+      const response = { 
         success: true,
         registrations,
-        statistics
-      });
+        pagination,
+        ...(statistics && { statistics })
+      };
+      
+      // Set cache headers for better performance
+      const responseObj = NextResponse.json(response);
+      responseObj.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      responseObj.headers.set('ETag', `"${Date.now()}-${totalCount}"`);
+      
+      return responseObj;
     } catch (queryError) {
       console.error('Institute Registration API: Database query failed:', queryError);
       return NextResponse.json(

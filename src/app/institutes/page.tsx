@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, Suspense, useRef } from 'react';
+import React, { useState, Suspense, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { PageLoader } from '@/components/ui/loading-spinner';
 import institute1 from '../../../public/institute-1.jpg';
+import { usePaginatedFetch, useSearchSuggestions } from '@/hooks/useOptimizedFetch';
 
 interface InstituteData {
   _id: string;
@@ -89,116 +90,57 @@ interface InstituteData {
   updatedAt: string;
 }
 
-interface PaginationData {
-  page: number;
-  limit: number;
-  totalPages: number;
-  totalCount: number;
-}
-
 const InstitutesContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   
-  const [searchQuery, setSearchQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedType, setSelectedType] = useState('');
-  const [institutes, setInstitutes] = useState<InstituteData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationData>({
-    page: 1,
-    limit: 12,
-    totalPages: 1,
-    totalCount: 0
-  });
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   // Get current page from URL or default to 1
   const currentPage = parseInt(searchParams.get('page') || '1');
   const currentLimit = parseInt(searchParams.get('limit') || '12');
 
-  // Track initial load and last page/limit to avoid loading during keyword search
-  const initialLoadRef = useRef(true);
-  const prevPageRef = useRef<number>(currentPage);
-  const prevLimitRef = useRef<number>(currentLimit);
+  // Use optimized paginated fetch hook
+  const {
+    data: institutes,
+    loading,
+    error,
+    pagination,
+    page,
+    limit,
+    searchQuery,
+    goToPage,
+    changeLimit,
+    updateSearch,
+  } = usePaginatedFetch<InstituteData[]>('/api/institute-registration', currentPage, currentLimit, {
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
-  // Fetch institutes data with pagination and optional search
+  // Mark as loaded after first successful fetch or error resolution
   useEffect(() => {
-    const fetchInstitutes = async () => {
-      try {
-        const isPageOrLimitChange = prevPageRef.current !== currentPage || prevLimitRef.current !== currentLimit;
-        if (initialLoadRef.current || isPageOrLimitChange) {
-          setLoading(true);
-        }
-        
-        // Build query parameters
-        const params = new URLSearchParams();
-        params.append('page', currentPage.toString());
-        params.append('limit', currentLimit.toString());
-        if (searchQuery.trim()) {
-          params.append('q', searchQuery.trim());
-        }
-        
-        const response = await fetch(`/api/institute-registration?${params.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch institutes');
-        }
-        
-        const data = await response.json();
-        
-        setInstitutes(data.registrations || []);
-        setPagination({
-          page: data.pagination?.page || currentPage,
-          limit: data.pagination?.limit || currentLimit,
-          totalPages: data.pagination?.totalPages || 1,
-          totalCount: data.pagination?.totalCount || 0
-        });
-      } catch (err) {
-        console.error('Error fetching institutes:', err);
-        setError('Failed to fetch institutes data');
-      } finally {
-        if (initialLoadRef.current) {
-          initialLoadRef.current = false;
-          setLoading(false);
-        } else if (prevPageRef.current !== currentPage || prevLimitRef.current !== currentLimit) {
-          setLoading(false);
-        }
-        prevPageRef.current = currentPage;
-        prevLimitRef.current = currentLimit;
-      }
-    };
+    if (!hasLoadedOnce && (Array.isArray(institutes) || error)) {
+      setHasLoadedOnce(true);
+    }
+  }, [institutes, error, hasLoadedOnce]);
 
-    fetchInstitutes();
-  }, [currentPage, currentLimit, searchQuery]);
+  // Ensure institutes is always an array
+  const institutesData = institutes || [];
 
-  // Fetch keyword suggestions
-  useEffect(() => {
-    const controller = new AbortController();
-    const run = async () => {
-      const q = searchQuery.trim();
-      if (!q) {
-        setSuggestions([]);
-        return;
-      }
-      try {
-        const res = await fetch(`/api/institute-registration?suggest=1&q=${encodeURIComponent(q)}`, { signal: controller.signal });
-        if (!res.ok) return;
-        const data = await res.json();
-        setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
-      } catch (_) {}
-    };
-    const t = setTimeout(run, 200);
-    return () => { clearTimeout(t); controller.abort(); };
-  }, [searchQuery]);
+  // Use optimized search suggestions hook
+  const { suggestions } = useSearchSuggestions(
+    '/api/institute-registration',
+    searchQuery
+  );
 
   // Update URL when page changes
   const updatePage = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', newPage.toString());
     router.push(`/institutes?${params.toString()}`);
+    goToPage(newPage);
   };
 
   // Update limit when changed
@@ -207,6 +149,7 @@ const InstitutesContent = () => {
     params.set('limit', newLimit.toString());
     params.set('page', '1'); // Reset to first page when changing limit
     router.push(`/institutes?${params.toString()}`);
+    changeLimit(newLimit);
   };
 
   const cities = [
@@ -229,7 +172,7 @@ const InstitutesContent = () => {
   const types = ["All Types", "Engineering", "Medical", "Management", "Design", "University"];
 
   const isServerSearchActive = searchQuery.trim().length > 0;
-  const filteredInstitutes = institutes.filter(institute => {
+  const filteredInstitutes = institutesData.filter(institute => {
     const matchesSearch = isServerSearchActive
       ? true // server already applied keyword/name/type filtering
       : (
@@ -243,8 +186,8 @@ const InstitutesContent = () => {
     return matchesSearch && matchesCity && matchesType;
   });
 
-  // Loading state
-  if (loading) {
+  // Loading state (only for initial load)
+  if (loading && !hasLoadedOnce) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -255,7 +198,7 @@ const InstitutesContent = () => {
   }
 
   // Error state
-  if (error) {
+  if (error && !hasLoadedOnce) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -312,12 +255,10 @@ const InstitutesContent = () => {
                 <Input
                   placeholder="Search institutes, courses, or locations..."
                   value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
-                  onFocus={() => setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onChange={(e) => updateSearch(e.target.value)}
                   className="pl-12 h-12 text-base"
                 />
-                {showSuggestions && suggestions.length > 0 && (
+                {suggestions.length > 0 && (
                   <div className="absolute z-20 mt-1 w-full bg-popover border border-border/50 rounded-md shadow-md max-h-64 overflow-auto">
                     {suggestions.map((s) => (
                       <button
@@ -325,7 +266,7 @@ const InstitutesContent = () => {
                         type="button"
                         className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground"
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { setSearchQuery(s); setShowSuggestions(false); }}
+                        onClick={() => updateSearch(s)}
                       >
                         {s}
                       </button>
@@ -368,14 +309,14 @@ const InstitutesContent = () => {
 
             <div className="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="text-sm text-muted-foreground">
-                Showing {filteredInstitutes.length} of {pagination.totalCount} institutions
-                {pagination.totalCount === 0 && ' - No institutes available yet'}
+                Showing {filteredInstitutes.length} of {pagination?.totalCount || 0} institutions
+                {pagination?.totalCount === 0 && ' - No institutes available yet'}
               </div>
               
               {/* Page Size Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Show:</span>
-                <Select value={currentLimit.toString()} onValueChange={(value) => updateLimit(parseInt(value))}>
+                <Select value={limit.toString()} onValueChange={(value) => updateLimit(parseInt(value))}>
                   <SelectTrigger className="w-20 h-8">
                     <SelectValue />
                   </SelectTrigger>
@@ -408,6 +349,7 @@ const InstitutesContent = () => {
                     src={institute.imageDataUrls?.[0] || institute1.src} 
                     alt={institute.name}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
                   />
                   {institute.status && (
                     <Badge className={`absolute top-3 left-3 ${
@@ -492,7 +434,7 @@ const InstitutesContent = () => {
             ))}
           </div>
 
-          {filteredInstitutes.length === 0 && pagination.totalCount > 0 && (
+          {filteredInstitutes.length === 0 && pagination?.totalCount && pagination.totalCount > 0 && (
             <div className="text-center py-16">
               <GraduationCap className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-foreground mb-2">No institutions found</h3>
@@ -500,7 +442,7 @@ const InstitutesContent = () => {
             </div>
           )}
 
-          {pagination.totalCount === 0 && (
+          {pagination?.totalCount === 0 && (
             <div className="text-center py-16">
               <GraduationCap className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-foreground mb-2">No institutions available</h3>
@@ -512,24 +454,24 @@ const InstitutesContent = () => {
           )}
 
           {/* Pagination Summary */}
-          {pagination.totalCount > 0 && (
+          {pagination && pagination.totalCount > 0 && (
             <div className="text-center py-6 border-t border-border/50">
               <div className="text-sm text-muted-foreground mb-2">
-                Showing page {currentPage} of {pagination.totalPages} 
-                ({Math.min((currentPage - 1) * currentLimit + 1, pagination.totalCount)} - {Math.min(currentPage * currentLimit, pagination.totalCount)} of {pagination.totalCount} institutes)
+                Showing page {page} of {pagination.totalPages} 
+                ({Math.min((page - 1) * limit + 1, pagination.totalCount)} - {Math.min(page * limit, pagination.totalCount)} of {pagination.totalCount} institutes)
               </div>
             </div>
           )}
 
           {/* Pagination */}
-          {pagination.totalPages > 1 && (
+          {pagination && pagination.totalPages > 1 && (
             <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-2 py-8">
               {/* First and Previous */}
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
                   onClick={() => updatePage(1)}
-                  disabled={currentPage === 1}
+                  disabled={page === 1}
                   className="flex items-center"
                   size="sm"
                 >
@@ -537,8 +479,8 @@ const InstitutesContent = () => {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => updatePage(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  onClick={() => updatePage(page - 1)}
+                  disabled={page === 1}
                   className="flex items-center"
                   size="sm"
                 >
@@ -552,12 +494,12 @@ const InstitutesContent = () => {
                   let pageNum;
                   if (pagination.totalPages <= 5) {
                     pageNum = i + 1;
-                  } else if (currentPage <= 3) {
+                  } else if (page <= 3) {
                     pageNum = i + 1;
-                  } else if (currentPage >= pagination.totalPages - 2) {
+                  } else if (page >= pagination.totalPages - 2) {
                     pageNum = pagination.totalPages - 4 + i;
                   } else {
-                    pageNum = currentPage - 2 + i;
+                    pageNum = page - 2 + i;
                   }
 
                   if (pageNum < 1 || pageNum > pagination.totalPages) return null;
@@ -565,7 +507,7 @@ const InstitutesContent = () => {
                   return (
                     <Button
                       key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
+                      variant={page === pageNum ? "default" : "outline"}
                       onClick={() => updatePage(pageNum)}
                       className="w-10 h-10"
                       size="sm"
@@ -580,8 +522,8 @@ const InstitutesContent = () => {
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
-                  onClick={() => updatePage(currentPage + 1)}
-                  disabled={currentPage === pagination.totalPages}
+                  onClick={() => updatePage(page + 1)}
+                  disabled={page === pagination.totalPages}
                   className="flex items-center"
                   size="sm"
                 >
@@ -590,7 +532,7 @@ const InstitutesContent = () => {
                 <Button
                   variant="outline"
                   onClick={() => updatePage(pagination.totalPages)}
-                  disabled={currentPage === pagination.totalPages}
+                  disabled={page === pagination.totalPages}
                   className="flex items-center"
                   size="sm"
                 >

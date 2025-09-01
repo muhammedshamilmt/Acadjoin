@@ -22,13 +22,12 @@ import {
   Filter,
   TrendingUp
 } from 'lucide-react';
+import { usePaginatedFetch } from '@/hooks/useOptimizedFetch';
 
 const Reviews = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInstitute, setSelectedInstitute] = useState('');
   const [selectedRating, setSelectedRating] = useState('');
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [likedReviews, setLikedReviews] = useState<Set<string>>(new Set());
   const { user, isAuthenticated, initializeFromStorage } = useAuth();
   const { toast } = useToast();
@@ -37,6 +36,23 @@ const Reviews = () => {
   useEffect(() => {
     initializeFromStorage();
   }, [initializeFromStorage]);
+
+  // Use optimized paginated fetch hook
+  const {
+    data: reviews = [],
+    loading,
+    error,
+    pagination,
+    page,
+    limit,
+    searchQuery: apiSearchQuery,
+    goToPage,
+    changeLimit,
+    updateSearch,
+  } = usePaginatedFetch<any[]>('/api/reviews', 1, 20, {
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
   // Fallback sample data if no reviews are loaded
   const fallbackReviews = [
@@ -78,43 +94,9 @@ const Reviews = () => {
     }
   ];
 
-  // Use fallback data if no reviews are loaded
-  const displayReviews = reviews.length > 0 ? reviews : fallbackReviews;
-
-  // Fetch reviews from database
-  useEffect(() => {
-    const fetchReviews = async () => {
-      try {
-        setLoading(true);
-        console.log('Fetching reviews...');
-        
-        const response = await fetch('/api/reviews');
-        console.log('Response status:', response.status);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Reviews data:', data);
-        
-        if (data.success) {
-          setReviews(data.reviews || []);
-          console.log('Reviews set:', data.reviews?.length || 0);
-        } else {
-          console.error('Failed to fetch reviews:', data.error);
-          setReviews([]);
-        }
-      } catch (error) {
-        console.error('Error fetching reviews:', error);
-        setReviews([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReviews();
-  }, []);
+  // Ensure reviews is always an array and use fallback if needed
+  const reviewsData = reviews || [];
+  const displayReviews = reviewsData.length > 0 ? reviewsData : fallbackReviews;
 
   // Check like status for current user
   useEffect(() => {
@@ -160,7 +142,8 @@ const Reviews = () => {
       const data = await response.json();
       
       if (data.success) {
-        setReviews(data.reviews);
+        // Trigger a refetch using the hook
+        updateSearch(searchQuery);
       }
     } catch (error) {
       console.error('Error refreshing reviews:', error);
@@ -206,18 +189,6 @@ const Reviews = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Update the reviews state
-        setReviews(prevReviews => 
-          prevReviews.map(review => 
-            review._id === reviewId 
-              ? { 
-                  ...review, 
-                  likes: data.liked ? review.likes + 1 : review.likes - 1 
-                }
-              : review
-          )
-        );
-
         // Update liked reviews state
         setLikedReviews(prev => {
           const newSet = new Set(prev);

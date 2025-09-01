@@ -68,7 +68,7 @@ const SettingsManagement = ({
     passwordMinLength: "8",
     
     // General Settings
-    siteName: "FuturePath",
+    siteName: "Acadjoin",
     siteDescription: "Educational platform connecting students and institutes",
     maintenanceMode: false,
     debugMode: false,
@@ -253,7 +253,7 @@ const SettingsManagement = ({
           sessionTimeout: "30",
           maxLoginAttempts: "5",
           passwordMinLength: "8",
-          siteName: "FuturePath",
+          siteName: "Acadjoin",
           siteDescription: "Educational platform connecting students and institutes",
           maintenanceMode: false,
           debugMode: false,

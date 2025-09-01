@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { MobileBottomNav } from "../components/mobile-bottom-nav";
 import { Toaster } from "@/components/ui/toaster";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +38,7 @@ export default function RootLayout({
           </div>
           <MobileBottomNav />
           <Toaster />
+          {/* <PerformanceMonitor /> */}
         </AuthProvider>
       </body>
     </html>

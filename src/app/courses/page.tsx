@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Search, 
@@ -26,6 +25,7 @@ import {
 } from 'lucide-react';
 import { PageLoader } from '@/components/ui/loading-spinner';
 import { useRouter } from 'next/navigation';
+import { useOptimizedFetch, useSearchSuggestions } from '@/hooks/useOptimizedFetch';
 
 interface InstituteRegistration {
   _id: string;
@@ -106,52 +106,36 @@ const Courses = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('');
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [institutes, setInstitutes] = useState<InstituteRegistration[]>([]);
-  const [people, setPeople] = useState<PeopleRegistration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  // Fetch data from database
+  // Use optimized fetch hooks for better performance
+  const [institutesState] = useOptimizedFetch<InstituteRegistration[]>('/api/institute-registration', {
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  const [peopleState] = useOptimizedFetch<PeopleRegistration[]>('/api/people-registration', {
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Mark as loaded after first fetch resolve
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Fetch institutes
-        const institutesResponse = await fetch('/api/institute-registration');
-        const institutesData = await institutesResponse.json();
-        
-        // Fetch people
-        const peopleResponse = await fetch('/api/people-registration');
-        const peopleData = await peopleResponse.json();
-        
-        if (institutesData.registrations && Array.isArray(institutesData.registrations)) {
-          setInstitutes(institutesData.registrations);
-        } else {
-          setInstitutes([]);
-        }
-        
-        if (peopleData.registrations && Array.isArray(peopleData.registrations)) {
-          setPeople(peopleData.registrations);
-        } else {
-          setPeople([]);
-        }
-        
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data. Please try again later.');
-        setInstitutes([]);
-        setPeople([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (!hasLoadedOnce && (Array.isArray(institutesState.data) || Array.isArray(peopleState.data) || institutesState.error || peopleState.error)) {
+      setHasLoadedOnce(true);
+    }
+  }, [hasLoadedOnce, institutesState.data, peopleState.data, institutesState.error, peopleState.error]);
 
-    fetchData();
-  }, []);
+  // Use optimized search suggestions
+  const { suggestions } = useSearchSuggestions(
+    '/api/institute-registration',
+    searchQuery
+  );
+
+  const institutes = institutesState.data || [];
+  const people = peopleState.data || [];
+  const isLoading = (institutesState.loading || peopleState.loading) && !hasLoadedOnce;
+  const error = institutesState.error || peopleState.error;
 
   // Get all available courses from institutes
   const getAllCourses = () => {
@@ -198,25 +182,6 @@ const Courses = () => {
     );
   };
 
-  // Build suggestions (courses + institute keywords)
-  useEffect(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) {
-      setSuggestions([]);
-      return;
-    }
-    const allCourses = getAllCourses();
-    const keywordSet = new Set<string>();
-    institutes.forEach(inst => {
-      if (Array.isArray(inst.keywords)) {
-        inst.keywords.forEach(k => { if (typeof k === 'string') keywordSet.add(k); });
-      }
-    });
-    const fromCourses = allCourses.filter(c => c.toLowerCase().includes(q));
-    const fromKeywords = Array.from(keywordSet).filter(k => k.toLowerCase().includes(q));
-    setSuggestions(Array.from(new Set([...fromCourses, ...fromKeywords])).slice(0, 10));
-  }, [searchQuery, institutes]);
-
   const filteredInstitutes = getFilteredInstitutes();
   const filteredPeople = getFilteredPeople();
 
@@ -255,7 +220,7 @@ const Courses = () => {
     );
   }
 
-  if (error) {
+  if (error && !hasLoadedOnce) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -308,12 +273,10 @@ const Courses = () => {
               <Input
                 placeholder="Search for courses (e.g., Computer Science, Data Science, MBA, MBBS)..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setShowSuggestions(true); }}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 h-14 text-base"
               />
-              {showSuggestions && suggestions.length > 0 && (
+              {suggestions.length > 0 && (
                 <div className="absolute z-20 mt-1 w-full bg-popover border border-border/50 rounded-md shadow-md max-h-64 overflow-auto">
                   {suggestions.map((s) => (
                     <button
@@ -321,7 +284,7 @@ const Courses = () => {
                       type="button"
                       className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => { setSearchQuery(s); setShowSuggestions(false); }}
+                      onClick={() => setSearchQuery(s)}
                     >
                       {s}
                     </button>
@@ -329,8 +292,6 @@ const Courses = () => {
                 </div>
               )}
             </div>
-
-            {/* Typeahead dropdown replaces static badge suggestions */}
 
             {searchQuery && (
               <div className="mt-4 text-sm text-muted-foreground">
@@ -371,6 +332,7 @@ const Courses = () => {
                             src={institute.imageDataUrls[0]} 
                             alt={institute.name}
                             className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
                           />
                         ) : (
                           <div className="w-full h-48 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -487,6 +449,7 @@ const Courses = () => {
                                   target.style.display = 'none';
                                   target.nextElementSibling?.classList.remove('hidden');
                                 }}
+                                loading="lazy"
                               />
                               <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full flex items-center justify-center hidden">
                                 <GraduationCap className="w-8 h-8 text-primary" />

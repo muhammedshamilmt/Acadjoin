@@ -346,7 +346,7 @@ const RegisterPeople = () => {
       // Show success message
       toast({
         title: "Success!",
-        description: "Profile created successfully! Welcome to EduPath!",
+        description: "Profile created successfully! Welcome to Acadjoin!",
         variant: "default",
       });
       

@@ -440,7 +440,7 @@ const InstituteProfile = () => {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_uygrrtKtEWuv1x',
         amount: orderData.order.amount,
         currency: orderData.order.currency,
-        name: 'FuturePath',
+        name: 'Acadjoin',
         description: 'Feature your institute on the landing page',
         order_id: orderData.order.id,
         prefill: {

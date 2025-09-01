@@ -95,7 +95,7 @@ const Contact = () => {
     {
       icon: <Mail className="w-6 h-6" />,
       title: "Email Us",
-      details: "support@edupath.com",
+      details: "support@acadjoin.com",
       description: "Send us an email anytime",
       color: "bg-blue-500"
     },
@@ -154,7 +154,7 @@ const Contact = () => {
             
             <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
               Contact 
-              <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent"> EduPath</span>
+              <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent"> Acadjoin</span>
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">

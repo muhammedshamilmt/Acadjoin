@@ -262,7 +262,7 @@ export default function Navbar() {
             href="/"
             className="text-2xl font-bold text-foreground hover:text-primary transition-colors duration-300"
           >
-            Future Path
+            Acadjoin
           </Link>
 
           {/* Desktop Navigation */}

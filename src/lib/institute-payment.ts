@@ -117,7 +117,7 @@ export const initiateInstitutePayment = async (options: InstitutePaymentOptions)
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_uygrrtKtEWuv1x',
       amount: orderResponse.order.amount,
       currency: orderResponse.order.currency,
-      name: 'FuturePath',
+      name: 'Acadjoin',
       description: `Institute Registration - ${options.instituteData.name}`,
       order_id: orderResponse.order.id,
       prefill: {

@@ -185,7 +185,7 @@ const CommunityGuidelines = () => {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-foreground mb-4">Our Core Guidelines</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              These principles guide how we interact and support each other in the EduPath community.
+              These principles guide how we interact and support each other in the Acadjoin community.
             </p>
           </div>
 
@@ -230,7 +230,7 @@ const CommunityGuidelines = () => {
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold text-foreground mb-4">What's Not Allowed</h2>
               <p className="text-muted-foreground">
-                To maintain a safe and helpful community, the following content is prohibited on EduPath.
+                To maintain a safe and helpful community, the following content is prohibited on Acadjoin.
               </p>
             </div>
 

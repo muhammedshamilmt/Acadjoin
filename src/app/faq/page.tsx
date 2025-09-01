@@ -30,20 +30,20 @@ const FAQ = () => {
       icon: <BookOpen className="w-4 h-4" />,
       faqs: [
         {
-          question: "What is EduPath?",
-          answer: "EduPath is a comprehensive platform that connects students with educational institutions across India. We provide verified reviews, detailed institution information, and facilitate connections between prospective students and current students/alumni."
+          question: "What is Acadjoin?",
+          answer: "Acadjoin is a comprehensive platform that connects students with educational institutions across India. We provide verified reviews, detailed institution information, and facilitate connections between prospective students and current students/alumni."
         },
         {
-          question: "Is EduPath free to use?",
-          answer: "Yes, EduPath is completely free for students. You can search institutions, read reviews, connect with mentors, and access all our resources at no cost."
+          question: "Is Acadjoin free to use?",
+          answer: "Yes, Acadjoin is completely free for students. You can search institutions, read reviews, connect with mentors, and access all our resources at no cost."
         },
         {
-          question: "How do I get started on EduPath?",
+          question: "How do I get started on Acadjoin?",
           answer: "Simply visit our homepage and start exploring! You can search for institutions, browse by location or course type, read reviews, and create an account to save your favorite institutions and connect with mentors."
         },
         {
-          question: "What makes EduPath different from other platforms?",
-          answer: "EduPath focuses specifically on the Indian education system with verified reviews, authentic student experiences, and a community-driven approach. We prioritize transparency and genuine connections between students."
+          question: "What makes Acadjoin different from other platforms?",
+          answer: "Acadjoin focuses specifically on the Indian education system with verified reviews, authentic student experiences, and a community-driven approach. We prioritize transparency and genuine connections between students."
         }
       ]
     },
@@ -99,7 +99,7 @@ const FAQ = () => {
       icon: <MessageCircle className="w-4 h-4" />,
       faqs: [
         {
-          question: "Are the reviews on EduPath authentic?",
+          question: "Are the reviews on Acadjoin authentic?",
           answer: "Yes, all reviews are verified. Reviewers must provide proof of enrollment or attendance. We have a strict moderation process to ensure authenticity."
         },
         {
@@ -130,8 +130,8 @@ const FAQ = () => {
           answer: "Ensure you're using the correct email and password. Try resetting your password if needed. Clear your browser cookies and try again."
         },
         {
-          question: "Can I use EduPath on my mobile device?",
-          answer: "Yes, EduPath is fully responsive and works on all devices including smartphones and tablets. We also have mobile apps coming soon."
+          question: "Can I use Acadjoin on my mobile device?",
+          answer: "Yes, Acadjoin is fully responsive and works on all devices including smartphones and tablets. We also have mobile apps coming soon."
         },
         {
           question: "Why can't I see certain features?",
@@ -195,7 +195,7 @@ const FAQ = () => {
             </h1>
             
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              Find quick answers to common questions about EduPath. Can't find what you're looking for? Contact our support team.
+              Find quick answers to common questions about Acadjoin. Can't find what you're looking for? Contact our support team.
             </p>
 
             {/* Search Bar */}
