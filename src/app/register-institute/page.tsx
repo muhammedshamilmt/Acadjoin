@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth as useAuthStore } from '@/lib/auth';
-import { initiateInstitutePayment, InstitutePaymentOptions, InstitutePaymentInstance } from '@/lib/institute-payment';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -39,6 +38,9 @@ import {
   Camera,
   ImageIcon
 } from 'lucide-react';
+
+// Public key is embedded at build-time; ensure it's defined in .env as NEXT_PUBLIC_RAZORPAY_KEY_ID
+const RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID as string | undefined;
 
 type FacultyMember = {
   name: string;
@@ -105,46 +107,41 @@ const RegisterInstitute = () => {
   const [courses, setCourses] = useState([{ name: '', duration: '', fees: '', seats: '', cutoff: '', viewDetailsLink: '', applyNowLink: '' }]);
   const [faculty, setFaculty] = useState<FacultyMember[]>([{ name: '', position: '', specialization: '', experience: '', publications: '', avatarDataUrl: '' }]);
   const [settings, setSettings] = useState<any>(null);
-  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
-  const [paymentInstance, setPaymentInstance] = useState<InstitutePaymentInstance | null>(null);
+  const [isPaidRegistration, setIsPaidRegistration] = useState<boolean>(false);
+  const [registrationFee, setRegistrationFee] = useState<number>(0);
   const [facilities, setFacilities] = useState(['']);
   const [recruiters, setRecruiters] = useState<Recruiter[]>([{ name: '', logoDataUrl: '' }]);
   const [keywordText, setKeywordText] = useState('');
   const [showLoadingToast, setShowLoadingToast] = useState(false);
   const [loadingToastData, setLoadingToastData] = useState({ title: '', description: '' });
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Fetch settings on component mount
+  // Settings are no longer required for payment; banner is shown statically
+  const [fileResetKey, setFileResetKey] = useState(0);
+
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/settings', { cache: 'no-store' });
+        const data = await res.json();
+        const s = data?.settings || {};
+        setSettings(s);
+        const paid = Boolean(s?.paidRegistration);
+        setIsPaidRegistration(paid);
+        const feeNum = Number(s?.registrationFee ?? 0);
+        setRegistrationFee(isNaN(feeNum) ? 0 : feeNum);
+      } catch (err) {
+        // fallback to defaults
+        setIsPaidRegistration(false);
+        setRegistrationFee(0);
+      }
+    };
     fetchSettings();
   }, []);
-
-  // Clear payment instance when form is reset or component unmounts
-  useEffect(() => {
-    return () => {
-      setPaymentInstance(null);
-    };
-  }, []);
-
-  const fetchSettings = async () => {
-    try {
-      const response = await fetch('/api/settings');
-      if (response.ok) {
-        const data = await response.json();
-        // Handle both old and new response formats
-        if (data.success && data.settings) {
-          setSettings(data.settings);
-        } else if (data.paidRegistration !== undefined) {
-          // Old format - direct settings object
-          setSettings(data);
-        } else {
-          console.error('Unexpected settings response format:', data);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-    }
-  };
-  const [fileResetKey, setFileResetKey] = useState(0);
 
   const [formData, setFormData] = useState<InstituteFormState>({
     // Basic Information
@@ -432,21 +429,24 @@ const RegisterInstitute = () => {
     // Start submission process
     setIsSubmitting(true);
     
-    // Show loading toast
+    if (isPaidRegistration && registrationFee > 0) {
+      try {
+        await handlePaidRegistration();
+      } catch (err) {
+        // handled inside
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // If not paid flow, proceed with free submission
     setLoadingToastData({
       title: "Processing Registration",
       description: "Please wait while we process your institute registration..."
     });
     setShowLoadingToast(true);
-
-    // Check if paid registration is enabled
-    if (settings?.paidRegistration) {
-      // Handle paid registration with payment
-      await handlePaidRegistration();
-    } else {
-      // Handle free registration
-      await handleFreeRegistration();
-    }
+    await handleFreeRegistration();
   };
 
   const handleNext = (e?: React.MouseEvent) => {
@@ -477,175 +477,11 @@ const RegisterInstitute = () => {
     }
   };
 
-  const handlePaidRegistration = async () => {
-    setIsPaymentProcessing(true);
-    try {
-      const registrationData = {
-        ...formData,
-        courses,
-        faculty,
-        facilities,
-        recruiters,
-      };
-
-      const paymentOptions: InstitutePaymentOptions = {
-        amount: settings?.registrationFee || 50,
-        currency: 'INR',
-        receipt: `inst_reg_${Date.now()}`,
-        notes: {
-          registrationType: 'institute_registration',
-        },
-        instituteData: {
-          ...registrationData,
-        },
-      };
-
-      // Update loading toast
-      setLoadingToastData({
-        title: "Initializing Payment",
-        description: `Setting up payment gateway for ₹${settings?.registrationFee || 50}...`
-      });
-
-      // Initialize payment
-      const paymentInstance: InstitutePaymentInstance = await initiateInstitutePayment(paymentOptions);
-      
-      // Store the payment instance
-      setPaymentInstance(paymentInstance);
-      
-      // Hide loading toast and show success message
-      setShowLoadingToast(false);
-      setIsSubmitting(false);
-      setIsPaymentProcessing(false);
-      
-      toast({
-        title: "Payment Ready",
-        description: `Payment system is ready. Click 'Open Payment' to proceed with ₹${settings?.registrationFee || 50} payment.`,
-        variant: "default",
-      });
-      
-    } catch (error: any) {
-      // Hide loading toast and show error
-      setShowLoadingToast(false);
-      setIsSubmitting(false);
-      setIsPaymentProcessing(false);
-      
-      toast({
-        title: "Registration Error",
-        description: error.message || 'Something went wrong during registration. Please try again.',
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleManualPayment = async () => {
-    if (!paymentInstance) {
-      toast({
-        title: "Payment Not Ready",
-        description: "Please complete the form first and click 'Pay & Submit'.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsPaymentProcessing(true);
-    
-    // Show loading toast for payment processing
-    setLoadingToastData({
-      title: "Processing Payment",
-      description: "Please complete the payment in the popup window..."
-    });
-    setShowLoadingToast(true);
-    
-    try {
-      // Now open the payment modal manually
-      const result = await paymentInstance.openPayment();
-      
-      if (result && typeof result === 'object' && 'success' in result && result.success) {
-        const paymentResult = result as any;
-        
-        // Update loading toast to success
-        setLoadingToastData({
-          title: "Registration Successful!",
-          description: "Your institute has been registered successfully."
-        });
-        
-        // Show success state briefly
-        setTimeout(() => {
-          setShowLoadingToast(false);
-          setIsSuccess(true);
-          setRegistrationId(paymentResult.registrationId || '');
-          
-          // Store success data before showing overlay
-          setSuccessData({
-            instituteName: formData.name,
-            registrationId: paymentResult.registrationId || '',
-            paymentId: paymentResult.paymentId || ''
-          });
-          
-          // Show success overlay
-          setShowSuccessOverlay(true);
-          
-          toast({
-            title: "Registration Successful!",
-            description: `Your institute registration has been completed successfully. Payment ID: ${paymentResult.paymentId}`,
-            variant: "default",
-          });
-
-          // Automatically log in the user
-          const storeUser = {
-            id: paymentResult.registrationId || '',
-            firstName: formData.name,
-            lastName: '',
-            email: formData.email,
-            role: 'institute',
-            type: 'institute',
-            instituteName: formData.name,
-            phone: formData.phone,
-            address: formData.address,
-            website: formData.website,
-            city: formData.city,
-            state: formData.state
-          };
-          loginStore(storeUser as any);
-
-          // Persist minimal identity in localStorage
-          try {
-            if (typeof window !== 'undefined') {
-              window.localStorage.setItem('fp_user_email', storeUser.email || '');
-              window.localStorage.setItem('fp_user_name', storeUser.instituteName || '');
-            }
-          } catch {}
-
-          // Refresh the page immediately after successful payment
-          window.location.reload();
-        }, 2000);
-      }
-    } catch (error: any) {
-      // Hide loading toast and show error
-      setShowLoadingToast(false);
-      
-      if (error.message === 'Payment failed') {
-        toast({
-          title: "Payment Failed",
-          description: 'Payment was cancelled or failed. Please try again.',
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Registration Error",
-          description: error.message || 'Something went wrong during registration. Please try again.',
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setIsPaymentProcessing(false);
-    }
-  };
+  // Payment gateway integrated above in handleSubmit
 
   const handleRegisterAnother = () => {
     setShowSuccessOverlay(false);
     setActiveTab('basic');
-    setPaymentInstance(null);
     setIsSuccess(false);
     setRegistrationId('');
     setSuccessData(null);
@@ -667,7 +503,17 @@ const RegisterInstitute = () => {
       recruiters,
       registrationId: "REG-INST-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
       registrationDate: new Date().toLocaleDateString(),
-      submittedAt: new Date().toISOString()
+      submittedAt: new Date().toISOString(),
+      payment: {
+        required: false,
+        amount: 0,
+        currency: 'INR',
+        status: 'unpaid',
+        orderId: '',
+        paymentId: '',
+        signature: '',
+        verified: false,
+      }
     };
 
     // Persist to DB via API
@@ -799,6 +645,198 @@ const RegisterInstitute = () => {
     }
   };
 
+  // Paid registration flow using Razorpay
+  const loadRazorpay = () => new Promise<boolean>((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if (document.getElementById('razorpay-sdk')) return resolve(true);
+    const script = document.createElement('script');
+    script.id = 'razorpay-sdk';
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
+  const handlePaidRegistration = async () => {
+    // Create order on server
+    try {
+      const paiseAmount = Math.round(Number(registrationFee) * 100);
+      const orderRes = await fetch('/api/payments/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: paiseAmount, currency: 'INR', notes: { purpose: 'Institute Registration' } })
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData?.order?.id) {
+        toast({ title: 'Payment Error', description: orderData?.error || 'Failed to create payment order', variant: 'destructive' });
+        return;
+      }
+
+      const sdkLoaded = await loadRazorpay();
+      if (!sdkLoaded) {
+        toast({ title: 'Payment Error', description: 'Failed to load payment SDK', variant: 'destructive' });
+        return;
+      }
+
+      const razorpayKey = RAZORPAY_KEY_ID || '';
+      if (!razorpayKey) {
+        toast({ title: 'Payment Config Error', description: 'Missing NEXT_PUBLIC_RAZORPAY_KEY_ID. Please configure the public key.', variant: 'destructive' });
+        return;
+      }
+
+      const options: any = {
+        key: razorpayKey,
+        amount: orderData.order.amount,
+        currency: orderData.order.currency,
+        name: 'Acadjoin',
+        description: 'Institute Registration Fee',
+        order_id: orderData.order.id,
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone,
+        },
+        notes: { registrationType: 'institute' },
+        theme: { color: '#0ea5e9' },
+        handler: async (response: any) => {
+          // Verify payment on server
+          try {
+            const verifyRes = await fetch('/api/payments/razorpay/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData?.success) {
+              toast({ title: 'Payment Failed', description: 'Payment verification failed', variant: 'destructive' });
+              return;
+            }
+
+            toast({ title: 'Payment Successful', description: 'Payment verified. Submitting registration...' });
+
+            // proceed submit with payment details
+            await submitWithPayment({
+              amount: orderData.order.amount,
+              currency: orderData.order.currency,
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+              verified: true,
+            });
+          } catch (err) {
+            toast({ title: 'Payment Error', description: 'An error occurred during payment verification', variant: 'destructive' });
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            toast({ title: 'Payment Cancelled', description: 'You closed the payment window', variant: 'destructive' });
+          }
+        }
+      };
+
+      const rz = new (window as any).Razorpay(options);
+      rz.open();
+    } catch (err) {
+      toast({ title: 'Payment Error', description: 'Unable to initiate payment', variant: 'destructive' });
+    }
+  };
+
+  const submitWithPayment = async (paymentInfo: { amount: number; currency: string; orderId: string; paymentId: string; signature: string; verified: boolean; }) => {
+    setLoadingToastData({ title: 'Processing Registration', description: 'Saving your institute information...' });
+    setShowLoadingToast(true);
+
+    const registrationData = {
+      ...formData,
+      courses,
+      faculty,
+      facilities,
+      recruiters,
+      registrationId: "REG-INST-" + Math.random().toString(36).substr(2, 9).toUpperCase(),
+      registrationDate: new Date().toLocaleDateString(),
+      submittedAt: new Date().toISOString(),
+      payment: {
+        required: true,
+        amount: Math.round(paymentInfo.amount) / 100,
+        currency: paymentInfo.currency || 'INR',
+        status: 'paid',
+        orderId: paymentInfo.orderId,
+        paymentId: paymentInfo.paymentId,
+        signature: paymentInfo.signature,
+        verified: Boolean(paymentInfo.verified),
+      }
+    };
+
+    try {
+      const res = await fetch('/api/institute-registration?status=submitted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(registrationData)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit registration');
+      }
+
+      setLoadingToastData({ title: 'Registration Successful!', description: 'Your institute has been registered successfully.' });
+      setTimeout(() => {
+        setShowLoadingToast(false);
+        setIsSuccess(true);
+        setRegistrationId(registrationData.registrationId);
+        toast({ title: 'Registration Submitted Successfully!', description: `Your institute registration (ID: ${registrationData.registrationId}) has been submitted for review. Welcome to Acadjoin!` });
+
+        if (data?.user) {
+          const u = data.user;
+          const storeUser = {
+            id: u.id || '',
+            firstName: u.firstName || '',
+            lastName: u.lastName || '',
+            email: u.email || '',
+            role: u.role || 'institute',
+            type: u.type || 'institute',
+            instituteName: u.instituteName || '',
+            phone: u.phone || '',
+            address: u.address || '',
+            website: u.website || '',
+            city: u.city || '',
+            state: u.state || ''
+          };
+          loginStore(storeUser as any);
+          try {
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem('fp_user_email', storeUser.email || '');
+              const fullName = storeUser.instituteName || storeUser.firstName || '';
+              window.localStorage.setItem('fp_user_name', fullName);
+            }
+          } catch {}
+        }
+
+        router.push('/');
+
+        // reset
+        setFormData({
+          name: '', type: '', city: '', state: '', description: '', established: '', website: '',
+          keywords: [], phone: '', email: '', password: '', confirmPassword: '', address: '',
+          totalStudents: '', accreditations: [], nirfRanking: '', qsRanking: '', timesRanking: '',
+          excellenceInEducation: '', placementRate: '', averagePackage: '', highestPackage: '',
+          logoDataUrl: '', imageDataUrls: []
+        });
+        setCourses([{ name: '', duration: '', fees: '', seats: '', cutoff: '', viewDetailsLink: '', applyNowLink: '' }]);
+        setFaculty([{ name: '', position: '', specialization: '', experience: '', publications: '', avatarDataUrl: '' }]);
+        setFacilities(['']);
+        setRecruiters([{ name: '', logoDataUrl: '' }]);
+        setActiveTab('basic');
+        setFileResetKey(prev => prev + 1);
+      }, 1500);
+    } catch (error) {
+      setShowLoadingToast(false);
+      toast({ title: 'Error', description: 'Failed to save registration after payment. Please contact support.', variant: 'destructive' });
+    }
+  };
+
 
 
 
@@ -829,11 +867,11 @@ const RegisterInstitute = () => {
               and showcase your programs, faculty, and achievements.
             </p>
             
-            {settings?.paidRegistration && (
+            {isMounted && isPaidRegistration && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-md mx-auto">
                 <div className="flex items-center gap-2 text-amber-800">
                   <AlertCircle className="w-5 h-5" />
-                  <span className="font-medium">Registration Fee: ₹{settings?.registrationFee || 50}</span>
+                  <span className="font-medium">Registration Fee: ₹{registrationFee || 0}</span>
                 </div>
                 <p className="text-sm text-amber-700 mt-1">
                   A one-time registration fee is required to complete your institute registration.
@@ -1615,35 +1653,14 @@ const RegisterInstitute = () => {
                       </Button>
                     ) : (
                       <>
-                        {settings?.paidRegistration && !paymentInstance ? (
-                          <Button 
-                            type="submit" 
-                            className="bg-primary hover:bg-primary/90" 
-                            disabled={isSubmitting || isPaymentProcessing}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            {isPaymentProcessing ? 'Processing Payment...' : `Pay ₹${settings?.registrationFee} & Submit`}
-                          </Button>
-                        ) : settings?.paidRegistration && paymentInstance ? (
-                          <Button 
-                            type="button" 
-                            onClick={handleManualPayment}
-                            className="bg-green-600 hover:bg-green-700" 
-                            disabled={isPaymentProcessing}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            {isPaymentProcessing ? 'Processing Payment...' : 'Open Payment'}
-                          </Button>
-                        ) : (
-                          <Button 
-                            type="submit" 
-                            className="bg-primary hover:bg-primary/90" 
-                            disabled={isSubmitting}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Submit for Review
-                          </Button>
-                        )}
+                        <Button 
+                          type="submit" 
+                          className="bg-primary hover:bg-primary/90" 
+                          disabled={isSubmitting}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          {isPaidRegistration && registrationFee > 0 ? 'Pay & Submit' : 'Submit for Review'}
+                        </Button>
                       </>
                     )}
                   </div>

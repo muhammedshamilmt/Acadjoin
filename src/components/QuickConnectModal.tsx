@@ -17,7 +17,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { initiatePayment, PaymentOptions } from '@/lib/razorpay';
+// Payment removed
 import { toast } from 'react-hot-toast';
 
 interface QuickConnectModalProps {
@@ -85,42 +85,9 @@ const QuickConnectModal = ({ isOpen, onClose, person }: QuickConnectModalProps) 
       return;
     }
 
-    setIsProcessing(true);
-    try {
-      // Close the modal immediately when payment starts
-      onClose();
-      
-      const paymentOptions: PaymentOptions = {
-        amount: 10, // 10 rupees for quick connect
-        currency: 'INR',
-        receipt: `quick_connect_${Date.now()}`,
-        notes: {
-          connectionType: 'quick_connect',
-          personName: `${person.firstName} ${person.lastName}`,
-        },
-        userId: user.uid,
-        connectedPersonId: person._id,
-        userName: userDetails?.displayName || user.displayName || 'User',
-        userEmail: user.email || '',
-        userPhone: user.phoneNumber || undefined,
-        userMobile: userDetails?.mobile || userDetails?.phone || '',
-      };
-
-      const result = await initiatePayment(paymentOptions);
-      
-      if (result && typeof result === 'object' && 'success' in result && result.success) {
-        toast.success('Payment successful! You are now connected.');
-      }
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      if (error.message === 'Payment failed') {
-        toast.error('Payment was cancelled or failed. Please try again.');
-      } else {
-        toast.error('Something went wrong. Please try again.');
-      }
-    } finally {
-      setIsProcessing(false);
-    }
+    // Payment removed; perform free quick connect placeholder
+    onClose();
+    toast.success('Connected successfully.');
   };
 
   const handleFreeConnect = () => {

@@ -42,7 +42,7 @@ import {
   Trash2,
   Loader2,
   Crown,
-  Clock,
+  Timer,
   Wrench,
   Image,
   Megaphone
@@ -73,9 +73,11 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import { loadRazorpayScript } from '@/lib/razorpay';
+// Payment removed
 import { MobileTabs } from '@/components/ui/mobile-tabs';
 import { PageLoader } from '@/components/ui/loading-spinner';
+// Razorpay public key for client-side checkout
+const RAZORPAY_KEY_ID = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID as string | undefined;
 
 const InstituteProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -88,6 +90,8 @@ const InstituteProfile = () => {
   const [isProcessingFeature, setIsProcessingFeature] = useState(false);
   const [isLandingFeatureEnabled, setIsLandingFeatureEnabled] = useState(false);
   const [isDisableConfirmOpen, setIsDisableConfirmOpen] = useState(false);
+  const [isAdsEnabled, setIsAdsEnabled] = useState(false);
+  const [isDisableAdsConfirmOpen, setIsDisableAdsConfirmOpen] = useState(false);
   
   const { user: firebaseUser } = useAuthContext();
   const { user: storeUser } = useAuthStore();
@@ -144,6 +148,11 @@ const InstituteProfile = () => {
           
           setDbProfileData(profile);
           setInstituteId(profile._id);
+          // Initialize premium feature toggles from DB
+          try {
+            setIsLandingFeatureEnabled(Boolean(profile.featuredOnLanding || profile.featureStatus === 'active'));
+            setIsAdsEnabled(Boolean(profile.adsEnabled || profile.adsStatus === 'active'));
+          } catch {}
           
           // Update local state with database data (instituteRegistrations)
           if (profile.name) setFormData(prev => ({ ...prev, name: profile.name }));
@@ -402,92 +411,205 @@ const InstituteProfile = () => {
     }]);
   };
 
+  // Load Razorpay SDK
+  const loadRazorpay = () => new Promise<boolean>((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if (document.getElementById('razorpay-sdk')) return resolve(true);
+    const script = document.createElement('script');
+    script.id = 'razorpay-sdk';
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
   const handleProceedFeaturePurchase = async () => {
+    setIsProcessingFeature(true);
+    const toastId = toast.loading('Initializing payment...');
     try {
-      setIsProcessingFeature(true);
-      await loadRazorpayScript();
-
-      const instituteName = (dbProfileData?.name || formData.name || '').toString();
-      const instituteEmail = (dbProfileData?.email || formData.email || '').toString();
-      const institutePhone = (dbProfileData?.phone || formData.phone || '').toString();
-
-      const amountInRupees = 1999; // Feature on landing page price (INR)
-
-      const orderRes = await fetch('/api/payments/create-order', {
+      const amountPaise = 1999 * 100; // ₹1,999
+      const orderRes = await fetch('/api/payments/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: amountInRupees,
-          currency: 'INR',
-          notes: {
-            paymentType: 'landing_page_feature',
-            instituteName,
-            instituteEmail,
-          },
-        }),
+        body: JSON.stringify({ amount: amountPaise, currency: 'INR', notes: { purpose: 'Landing Feature' } })
       });
-
-      if (!orderRes.ok) {
-        throw new Error('Failed to create payment order');
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData?.order?.id) {
+        toast.error(orderData?.error || 'Failed to initiate payment', { id: toastId });
+        return;
       }
 
-      const orderData = await orderRes.json();
-      if (!orderData?.success || !orderData?.order?.id) {
-        throw new Error('Invalid order response');
+      const sdkOk = await loadRazorpay();
+      if (!sdkOk) {
+        toast.error('Failed to load payment gateway', { id: toastId });
+        return;
+      }
+      const key = RAZORPAY_KEY_ID || '';
+      if (!key) {
+        toast.error('Missing NEXT_PUBLIC_RAZORPAY_KEY_ID', { id: toastId });
+        return;
       }
 
       const options: any = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_uygrrtKtEWuv1x',
+        key,
         amount: orderData.order.amount,
         currency: orderData.order.currency,
         name: 'Acadjoin',
-        description: 'Feature your institute on the landing page',
+        description: 'Landing Page Feature',
         order_id: orderData.order.id,
         prefill: {
-          name: instituteName,
-          email: instituteEmail,
-          contact: institutePhone,
+          name: dbProfileData?.name || formData.name,
+          email: dbProfileData?.email || formData.email,
+          contact: dbProfileData?.phone || formData.phone,
         },
-        notes: {
-          feature: 'landing_page',
-          instituteName,
-          instituteEmail,
-        },
-        theme: { color: '#3B82F6' },
-      };
-
-      const razorpay = new (window as any).Razorpay(options);
-      razorpay.on('payment.failed', () => {
-        setIsProcessingFeature(false);
-        toast.error('Payment failed. Please try again.');
-      });
-      razorpay.on('payment.success', async (response: any) => {
-        setIsProcessingFeature(false);
-        setIsFeatureDialogOpen(false);
-        setIsLandingFeatureEnabled(true);
-        try {
-          if (instituteId) {
-            await fetch(`/api/institute-registration/${instituteId}`, {
-              method: 'PATCH',
+        theme: { color: '#0ea5e9' },
+        handler: async (response: any) => {
+          toast.loading('Verifying payment...', { id: toastId });
+          try {
+            const verifyRes = await fetch('/api/payments/razorpay/verify', {
+              method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                featuredOnLanding: true,
-                featureStatus: 'active',
-                featurePurchasedAt: new Date().toISOString(),
-                featureOrderId: response?.razorpay_order_id || '',
-                featurePaymentId: response?.razorpay_payment_id || '',
-              }),
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
             });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData?.success) {
+              toast.error('Payment verification failed', { id: toastId });
+              return;
+            }
+
+      setIsLandingFeatureEnabled(true);
+      if (instituteId) {
+        await fetch(`/api/institute-registration/${instituteId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            featuredOnLanding: true,
+            featureStatus: 'active',
+            featurePurchasedAt: new Date().toISOString(),
+                  featurePayment: {
+                    amount: orderData.order.amount / 100,
+                    currency: orderData.order.currency,
+                    orderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                    verified: true,
+                    status: 'paid'
+                  }
+          }),
+        });
+      }
+            toast.success('Payment successful. Your institute will be featured.', { id: toastId });
+          } catch (_err) {
+            toast.error('Error finalizing purchase', { id: toastId });
           }
-        } catch (_err) {
-          // Non-blocking: UI is already updated
-        }
-        toast.success('Payment successful! Your institute will be featured.');
-      });
-      razorpay.open();
-    } catch (error: any) {
+        },
+        modal: { ondismiss: () => toast.error('Payment cancelled', { id: toastId }) }
+      };
+
+      const rz = new (window as any).Razorpay(options);
+      rz.open();
+    } catch (_err) {
+      toast.error('Unable to start payment', { id: toastId });
+    } finally {
       setIsProcessingFeature(false);
-      toast.error(error?.message || 'Could not initiate payment');
+    }
+  };
+
+  const handleProceedAdsPurchase = async () => {
+    setIsProcessingFeature(true);
+    try {
+      const amountPaise = 999 * 100; // ₹999
+      const orderRes = await fetch('/api/payments/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amountPaise, currency: 'INR', notes: { purpose: 'Show Ads Feature' } })
+      });
+      const orderData = await orderRes.json();
+      if (!orderRes.ok || !orderData?.order?.id) {
+        toast.error(orderData?.error || 'Failed to initiate payment');
+        return;
+      }
+
+      const sdkOk = await loadRazorpay();
+      if (!sdkOk) {
+        toast.error('Failed to load payment gateway');
+        return;
+      }
+      const key = RAZORPAY_KEY_ID || '';
+      if (!key) {
+        toast.error('Missing NEXT_PUBLIC_RAZORPAY_KEY_ID');
+        return;
+      }
+
+      const options: any = {
+        key,
+        amount: orderData.order.amount,
+        currency: orderData.order.currency,
+        name: 'Acadjoin',
+        description: 'Show Ads Feature',
+        order_id: orderData.order.id,
+        prefill: {
+          name: dbProfileData?.name || formData.name,
+          email: dbProfileData?.email || formData.email,
+          contact: dbProfileData?.phone || formData.phone,
+        },
+        theme: { color: '#0ea5e9' },
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await fetch('/api/payments/razorpay/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok || !verifyData?.success) {
+              toast.error('Payment verification failed');
+              return;
+            }
+
+            setIsAdsEnabled(true);
+            if (instituteId) {
+              await fetch(`/api/institute-registration/${instituteId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  adsEnabled: true,
+                  adsStatus: 'active',
+                  adsPurchasedAt: new Date().toISOString(),
+                  adsPayment: {
+                    amount: orderData.order.amount / 100,
+                    currency: orderData.order.currency,
+                    orderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                    verified: true,
+                    status: 'paid'
+                  }
+                }),
+              });
+            }
+            toast.success('Payment successful. Ads enabled.');
+          } catch (_err) {
+            toast.error('Error finalizing purchase');
+          }
+        },
+        modal: { ondismiss: () => toast.error('Payment cancelled') }
+      };
+
+      const rz = new (window as any).Razorpay(options);
+      rz.open();
+    } catch (_err) {
+      toast.error('Unable to start payment');
+    } finally {
+      setIsProcessingFeature(false);
     }
   };
 
@@ -2315,16 +2437,34 @@ const InstituteProfile = () => {
                             </div>
                           </div>
                           <div className="relative">
-                            <Switch disabled />
-                            <div className="absolute inset-0 bg-muted/50 rounded-md cursor-not-allowed"></div>
+                            <Switch 
+                              checked={isAdsEnabled}
+                              onCheckedChange={async (checked) => {
+                                if (checked) {
+                                  // Only enable ads; do not change landing toggle
+                                  await handleProceedAdsPurchase();
+                                } else {
+                                  setIsDisableAdsConfirmOpen(true);
+                                }
+                              }}
+                            />
                           </div>
                         </div>
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                          <div className="flex items-center gap-2 text-yellow-800">
-                            <Clock className="w-4 h-4" />
-                            <span className="text-sm font-medium">Coming Soon</span>
+                        <div className="bg-muted/30 border border-border/50 rounded-lg p-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                            <div>
+                              <div className="text-sm text-muted-foreground mb-2">Pricing</div>
+                              <div className="text-2xl font-bold">₹999 <span className="text-sm font-normal text-muted-foreground">/ 30 days</span></div>
+                              <ul className="mt-3 text-sm text-muted-foreground space-y-1">
+                                <li>✓ Run ads on your institute pages</li>
+                                <li>✓ Increase visibility</li>
+                                <li>✓ Manage promotions</li>
+                              </ul>
                           </div>
-                          <p className="text-xs text-yellow-700 mt-1">This feature will be available in the next update</p>
+                            <div className="hidden md:block w-full h-28 rounded-lg overflow-hidden">
+                              <img src="/institute-1.jpg" alt="Ads Preview" className="w-full h-full object-cover" />
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -2341,9 +2481,10 @@ const InstituteProfile = () => {
                           <div className="relative">
                             <Switch 
                               checked={isLandingFeatureEnabled}
-                              onCheckedChange={(checked) => {
+                              onCheckedChange={async (checked) => {
                                 if (checked) {
-                                  setIsFeatureDialogOpen(true);
+                                  // Only enable landing feature; do not change ads toggle
+                                  await handleProceedFeaturePurchase();
                                 } else {
                                   setIsDisableConfirmOpen(true);
                                 }
@@ -2465,6 +2606,47 @@ const InstituteProfile = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Disable Ads confirmation dialog */}
+        <AlertDialog open={isDisableAdsConfirmOpen} onOpenChange={setIsDisableAdsConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Turn off ads?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your institute advertisements will stop running. You can enable them again anytime by purchasing the feature.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsDisableAdsConfirmOpen(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setIsAdsEnabled(false);
+                  setIsDisableAdsConfirmOpen(false);
+                  (async () => {
+                    try {
+                      if (instituteId) {
+                        await fetch(`/api/institute-registration/${instituteId}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            adsEnabled: false,
+                            adsStatus: 'inactive',
+                            adsDisabledAt: new Date().toISOString(),
+                          }),
+                        });
+                      }
+                    } catch (_err) {
+                      // non-blocking
+                    }
+                  })();
+                  toast.success('Ads disabled');
+                }}
+              >
+                Turn Off
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Disable confirmation dialog */}
         <AlertDialog open={isDisableConfirmOpen} onOpenChange={setIsDisableConfirmOpen}>

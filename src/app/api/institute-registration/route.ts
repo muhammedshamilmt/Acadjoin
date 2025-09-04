@@ -339,6 +339,26 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       updatedAt: new Date(),
       password: hashedPassword, // keep hashed; excluded in GET list via projection
+      // payment info (optional)
+      payment: body.payment ? {
+        required: Boolean(body.payment.required),
+        amount: Number(body.payment.amount) || 0,
+        currency: body.payment.currency || 'INR',
+        status: body.payment.status || 'unpaid',
+        orderId: body.payment.orderId || '',
+        paymentId: body.payment.paymentId || '',
+        signature: body.payment.signature || '',
+        verified: Boolean(body.payment.verified),
+      } : {
+        required: false,
+        amount: 0,
+        currency: 'INR',
+        status: 'unpaid',
+        orderId: '',
+        paymentId: '',
+        signature: '',
+        verified: false,
+      },
     };
 
     const col = await getCollection('instituteRegistrations');

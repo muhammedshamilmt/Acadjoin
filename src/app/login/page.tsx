@@ -164,6 +164,10 @@ export default function Login() {
       // Redirect based on user role
       if (data?.user?.isAdmin || data?.user?.role === 'admin') {
         router.push('/admin')
+      } else if (data?.user?.role === 'institute') {
+        router.push('/institute-profile')
+      } else if (data?.user?.role === 'individual') {
+        router.push('/people-profile')
       } else {
         router.push('/')
       }
